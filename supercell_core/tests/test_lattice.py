@@ -1,0 +1,284 @@
+import unittest as ut
+import os
+import numpy as np
+
+from io import StringIO
+from unittest.mock import patch
+
+import supercell_core as sc
+
+from ..errors import *
+
+
+class TestLattice(ut.TestCase):
+    """
+    Test Lattice object
+    """
+
+    def test_vectors_good(self) -> None:
+        """
+        Tests methods: set_vectors, and vectors
+        (cases where it succeeds)
+        """
+        lay = sc.lattice()
+
+        # Testing default values
+        self.assertEqual(lay.vectors(), [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+
+        # Setting two 2D elementary cell vectors, omitting z axis as irrelevant
+        lay.set_vectors([2, 3], [1, 4])
+        self.assertEqual(lay.vectors(), [[2, 3, 0], [1, 4, 0], [0, 0, 1]])
+
+        # Set two 3D elementary cell vectors while omitting the 3rd one is
+        # nonsensical, unless you give '0' as z-component of these vectors
+        lay.set_vectors([2, 3, 0], [1, 5, 0])
+        self.assertEqual(lay.vectors(), [[2, 3, 0], [1, 5, 0], [0, 0, 1]])
+
+        # When z-component is non '0' but the 3rd vector is left default,
+        # (which means it's unclear whether 'z' direction is important for
+        # the user) a warning should be issued
+        with self.assertWarns(UserWarning, msg=Warning.ZComponentWhenNoZVector):
+            lay.set_vectors([2, 3, 0], [1, 5, 0.2])
+            self.assertEqual(lay.vectors(), [[2, 3, 0], [1, 5, 0.2], [0, 0, 1]])
+
+        # Set three 3D vectors
+        lay.set_vectors([2, 3, 0], [1, 6, 1], [7, 8, 9])
+        self.assertEqual(lay.vectors(), [[2, 3, 0], [1, 6, 1], [7, 8, 9]])
+
+        # Change only part of the vector – are you sure z-component is what you
+        # think it is?
+        lay = sc.lattice()
+        lay.set_vectors([1, 0, 1], [0, 1, 1], [0, 0, 1])
+        with self.assertWarns(UserWarning, msg=Warning.ReassigningPartOfVector):
+            lay.set_vectors([2, 0], [0, 3])
+
+    def test_vectors_bad(self) -> None:
+        """
+        Tests methods: set_vectors, and vectors
+        (cases where they should fail)
+        """
+        lay = sc.lattice()
+
+        # Test bad type of values passed to the function
+        with self.assertRaises(TypeError):
+            # Too few arguments – less than two
+            lay.set_vectors([1, 2])
+
+            # Too many arguments – more than three
+            lay.set_vectors([1, 2, 0], [3, 4, 0], [5, 6, 7], [8, 9, 0])
+
+            # Too short vectors
+            lay.set_vectors([1], [5])
+
+            # Too long vectors
+            lay.set_vectors([1, 2, 3, 4], [5, 6, 7, 8])
+
+            # Mismatched vectors length
+            lay.set_vectors([1, 2], [1, 2, 3])
+
+            # Wrong type
+            lay.set_vectors([1, 2, 3], ["5", "6", "7"])
+
+            # Any arguments passed to vectors
+            lay.vectors("whatever")
+
+        # Test incorrect data passed to function
+        with self.assertRaises(LinearDependenceError):
+            # Two linearly dependent vectors
+            lay.set_vectors([1, 2], [2, 4])
+
+            # One vector is linear combination of the second and the default
+            # third vector ([0, 0, 1])
+            lay.set_vectors([0, 1, 1], [0, 1, 0])
+
+    def assertAtomsEqual(self, a1, a2):
+        if len(a1) == 3:
+            el1, pos1, spin1 = a1
+        elif len(a1) == 2:
+            el1, pos1 = a1
+            spin1 = (0, 0, 0)
+        else:
+            self.assertTrue(False, "bad atom")
+
+        if len(a2) == 3:
+            el2, pos2, spin2 = a2
+        elif len(a2) == 2:
+            el2, pos2 = a2
+            spin2 = (0, 0, 0)
+        else:
+            self.assertTrue(False, "bad atom")
+
+        self.assertEqual(el1, el2)
+        self.assertEqual(spin1, spin2)
+        self.assertTrue(np.all(pos1 == pos2))
+
+    def test_add_atoms_good(self) -> None:
+        """
+        Tests methods: add_atom, add_atoms, and atoms
+        """
+        lay = sc.lattice()
+
+        # Test default (no atoms in an elementary cell)
+        self.assertEqual(lay.atoms(), [])
+
+        # Test add_atom Helium (default unit: angstrom)
+        he = ("He", (0.1, 0.2, 0.3))
+        lay.add_atom(*he)
+        self.assertAtomsEqual(lay.atoms()[0], he)
+
+        # Test add_atoms: Hydrogen and Lithium
+        # Retaining element order is expected
+        h, li = ("H", np.array([0, 0, 0])),\
+                ("Li", np.array([0.9, 0.9, 0.9]), (0, 1, 2))
+        lay.add_atoms([h, li])
+        for a1, a2 in zip(lay.atoms(), [he, h, li]):
+            self.assertAtomsEqual(a1, a2)
+
+        # Add atom using 2D position vector
+        be = ("Be", (0.5, 0.5), (0, 0, 1))
+        lay.add_atom(*be)
+        self.assertAtomsEqual(lay.atoms()[-1],
+                              ("Be", np.array([0.5, 0.5, 0]), (0, 0, 1)))
+
+        # When atom is outside the elementary cell, a warning should be logged
+        with self.assertWarns(UserWarning, msg=Warning.AtomOutsideElementaryCell):
+            lay.add_atom("C", (2, 0, 0))
+
+        # Element symbol not in the periodic table
+        with self.assertWarns(UserWarning, msg=Warning.UnknownChemicalElement):
+            lay.add_atom("Helium", (1, 0, 0))  # should be: "He"
+
+        # Add atom using crystal units
+        lay = sc.lattice()
+        lay.set_vectors([2, 0, 0], [2, 2, 0], [0, 0, 3])
+        lay.add_atom("Na", (0.5, 0.5, 0.5), unit=sc.Unit.Crystal)
+        self.assertAtomsEqual(lay.atoms()[0], ("Na", (2, 1, 1.5)))
+
+        # Change lattice vectors after adding atoms
+        lay.set_vectors([4, 0, 0], [4, 4, 0], [0, 0, 6],
+                        atoms_behaviour=sc.Unit.Crystal)
+        self.assertAtomsEqual(lay.atoms()[0], ("Na", (4, 2, 3)))
+
+        lay.set_vectors([8, 0, 0], [8, 8, 0], [0, 0, 12],
+                        atoms_behaviour=sc.Unit.Angstrom)
+        self.assertAtomsEqual(lay.atoms()[0], ("Na", (4, 2, 3)))
+
+        # List atoms using CRYSTAL units
+        lay = sc.lattice()
+        lay.set_vectors([2, 0, 0], [2, 2, 0], [0, 0, 3])
+        lay.add_atom("Na", (0.5, 0.5, 0.5), unit=sc.Unit.Crystal)
+        self.assertAtomsEqual(lay.atoms()[0], ("Na", (2, 1, 1.5)))
+        self.assertAtomsEqual(lay.atoms(unit=sc.Unit.Crystal)[0],
+                              ("Na", (0.5, 0.5, 0.5)))
+
+    def test_add_atoms_bad(self) -> None:
+        """
+        Tests methods: add_atom, and add_atoms, where they should fail
+        """
+        lay = sc.lattice()
+
+        # Adding atoms before changing elementary cell vectors:
+        # (we don't know what to do with the atomic positions,
+        # so we refuse the temptation to guess and raise an error)
+        # Note: set_vectors should have a behaviour flag allowing
+        # specifying what to do with the atomic positions
+        lay.add_atom("Na", (0.5, 0.5, 0.5), unit=sc.Unit.Crystal)
+        with self.assertRaises(UndefinedBehaviourError):
+            lay.set_vectors([4, 0, 0], [4, 4, 0], [0, 0, 6])
+
+        # Test bad type of values passed to function
+        with self.assertRaises(TypeError):
+            # Bad length of atomic position vector
+            lay.add_atom("O", (0))
+            lay.add_atom("O", (1, 2, 3, 4))
+
+            # Bad number of arguments to add atom
+            lay.add_atom("N")
+            lay.add_atom("N", 0, 0)
+
+            # Non-atom passed to add_atoms
+            lay.add_atoms(["whatever"])
+
+            # Non-unit passed as unit
+            lay.add_atom("N", (0, 0), unit="meter")
+
+    def test_save_POSCAR(self):
+        os.system("mkdir -p tmp")
+        fn = "tmp/test_POSCAR"
+        lay = sc.lattice()
+        lay.set_vectors([1, 2, 3], [0.5, 0.7, 0.91], [3, 1, 0])
+        lay.add_atoms([
+            ("Fe", (0, 2)),
+            ("Zn", (1, 0.5, 3), (0, 1, -1)),
+            ("Zn", (0.1, 0.2, 0.7)),
+            ("Zn", (0, 0, 0))
+        ])
+
+        expected_poscar = """supercell_generated_POSCAR
+1.0
+1 2 3
+0.5 0.7 0.91
+3 1 0
+1 3
+Direct
+-21.84 72 -4.72
+17.38 -54 3.54
+2.66 -8 0.48
+0 0 0
+"""
+
+        lay.save_POSCAR(filename=fn)
+        with open(fn, 'r') as f:
+            poscar = f.read()
+        os.system("rm -f " + fn)
+
+        self.assertEqual(expected_poscar, poscar)
+
+        # test stdout
+        names = ["Fe", "Zn"]
+        # https://stackoverflow.com/questions/4219717/how-to-assert-output-with-nosetest-unittest-in-python
+        with patch('sys.stdout', new=StringIO()) as fakeOutput:
+            lay.save_POSCAR()
+            self.assertEqual(fakeOutput.getvalue(), expected_poscar + "\n" + \
+                             "Note: Order of the atomic species in this generated POSCAR " + \
+                             "file is as follows:\n" + " ".join(names) + "\n")
+
+    def test_save_xsf(self):
+        os.system("mkdir -p tmp")
+        fn = "tmp/test.xsf"
+        lay = sc.lattice()
+        lay.set_vectors([1, 2, 3], [0.5, 0.7, 0.91], [3, 1, 0])
+        lay.add_atoms([
+            ("Fe", (0, 2)),
+            ("Zn", (1, 0.5, 3), (0, 1, -1)),
+            ("Zn", (0.1, 0.2, 0.7)),
+            ("Zn", (0, 0, 0))
+        ])
+
+        expected_xsf = """CRYSTAL
+
+PRIMVEC
+1 2 3
+0.5 0.7 0.91
+3 1 0
+
+PRIMCOORD
+4 1
+26 0 2 0 0 0 0
+30 1 0.5 3 0 1 -1
+30 0.1 0.2 0.7 0 0 0
+30 0 0 0 0 0 0
+"""
+
+        lay.save_xsf(filename=fn)
+        with open(fn, 'r') as f:
+            xsf = f.read()
+        os.system("rm -f " + fn)
+
+        self.assertEqual(expected_xsf, xsf)
+
+        # test stdout
+        # https://stackoverflow.com/questions/4219717/how-to-assert-output-with-nosetest-unittest-in-python
+        with patch('sys.stdout', new=StringIO()) as fakeOutput:
+            lay.save_xsf()
+            self.assertEqual(fakeOutput.getvalue(), expected_xsf)
