@@ -3,7 +3,7 @@ This file contains names of various physical qties, objects, units etc.
 and their mapping to values used in the calculations
 """
 
-from typing import Union, Tuple, List, Sequence
+from typing import Union, Sequence
 from enum import Enum, auto
 import numpy as np
 
@@ -33,6 +33,9 @@ PERIODIC_TABLE = (
     "Mc", "Lv", "Ts", "Og"
 )
 
+# constants that might be useful
+Z_SPIN_UP = (0, 0, 1)
+Z_SPIN_DOWN = (0, 0, -1)
 
 def element_symbol(atomic_no: int) -> str:
     """
