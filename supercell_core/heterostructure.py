@@ -2,28 +2,8 @@ from typing import Optional, Union, List, Tuple
 import numpy as np
 
 from .lattice import Lattice
-from .physics import Number, Quantity, Unit, DEGREE
-from .result import *
-
-# Type alias for an angle
-Angle = Number
-
-# Type aliases for range of angles
-AngleRange = Tuple[Angle, Angle, Angle]
-
-# Type alias for immutable representation of 2x2 matrix
-TupleMatrix2x2 = Tuple[Tuple[Number, Number], Tuple[Number, Number]]
-
-# Type alias for mutable represenation of 2x2 matrix
-ListMatrix2x2 = List[List[Number]]
-
-# Type alias for Numpy 2x2 array (used internally to represent 2D square matrices)
-# note: no support on dimensionality and ndarray dtype typing available yet
-Matrix2x2 = np.ndarray
-
-# Type alias for a description of 2D square matrix that can be entered into
-# a public method
-InMatrix2x2 = Union[TupleMatrix2x2, Matrix2x2, ListMatrix2x2]
+from .physics import *
+from .result import CalcResult, PlotResult
 
 
 class Heterostructure:
@@ -48,6 +28,13 @@ class Heterostructure:
 
     """
 
+    __layers: List[Tuple[Lattice, AngleRange]]
+
+    def __init__(self):
+        # We store data on preferred theta (or theta range) as second element
+        # of the pair, alongside with the Lattice itself
+        self.__layers = []
+
     def set_substrate(self, substrate: Lattice) -> None:
         """
         Defines substrate layer of the heterostructure
@@ -62,11 +49,26 @@ class Heterostructure:
         -------
         None
         """
-        pass
+        self.__substrate = substrate
+
+    def substrate(self) -> Lattice:
+        """
+        Getter for the substrate of the heterostructure
+
+        Returns
+        -------
+        Lattice
+
+        Raises
+        ------
+        AttributeError
+            if substrate wasn't set yet
+        """
+        return self.__substrate
 
     def add_layer(self, layer: Lattice, pos: Optional[int] = None,
                   theta: Union[Angle, AngleRange] =
-                  (0, 180 * DEGREE, 0.1 * DEGREE)) -> None:
+                  (0, 180 * DEGREE, 0.1 * DEGREE)) -> int:
         """
         Adds a 2D crystal to the system
 
@@ -91,29 +93,116 @@ class Heterostructure:
 
         Returns
         -------
-        None
+        int
+            Position of the added layer in the stack
         """
+        try:
+            # if theta is an Angle `float` will work
+            theta = (float(theta), float(theta), 1.0)
+        except TypeError:
+            assert len(theta) == 3
+
+        if pos is None:
+            self.__layers.append((layer, theta))
+            return len(self.__layers)
+        else:
+            self.__layers.insert(pos - 1, (layer, theta))
+            return pos
+
 
     def add_layers(self, layers: List[Union[Lattice,
                                             Tuple[Lattice,
-                                                  Union[Angle, AngleRange]]]]):
-        pass
+                                                  Union[Angle, AngleRange]]]])\
+            -> None:
+        """
+        Adds a lot of layers to the heterostructure at once
 
-    def substrate(self) -> List[Lattice]:
-        pass
+        Parameters
+        ----------
+        layers : List[
+            Lattice,
+            or (Lattice, float),
+            or (Lattice, (float, float, float))
+        ]
+            List of layers to add to the structure.
+            If list element is a tuple, the second element serves the same way
+            as `theta` parameter in `add_layer`
+
+        Returns
+        -------
+        None
+        """
+        for el in layers:
+            # if el is a Lattice
+            if type(el) is Lattice:
+                self.add_layer(el)
+            # if el is (Lattice, Angle) or (Lattice, AngleRange)
+            else:
+                self.add_layer(el[0], theta=el[1])
 
     def layers(self) -> List[Lattice]:
-        pass
+        """
+        Returns layers in the heterostructure
 
-    def remove_layer(self, layer_no: int) -> None:
-        pass
+        Returns
+        -------
+        List[Lattice]
+            List of layers on the substrate as Lattice objects
+        """
+        return [el[0] for el in self.__layers]
 
-    # TODO: add parameter for the heuristic, how many best guesses to check
+    def remove_layer(self, pos: int) -> None:
+        """
+        Removes layer in position `pos`
+
+        Parameters
+        ----------
+        pos : int
+            Position of the layer in the stack, counting from the substrate up
+            (first position is 1).
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        IndexError
+            If there's less layers in the stack than `pos`
+        """
+        del(self.__layers[pos - 1])
+
+    def get_layer(self, pos: int) -> Tuple[Lattice, AngleRange]:
+        """
+        Get Lattice object describing layer at position `pos` and information
+        on preferred theta angles for that layer
+
+        Parameters
+        ----------
+        pos : int
+            Position of the layer in the stack, counting from the substrate up
+            (first position is 1).
+
+        Returns
+        -------
+        Lattice
+            Lattice object describing the layer
+        (float, float, float)
+            (start, stop, step) (radians) – angles used in `calc`, `opt`, and
+            `plot` calculations
+            If a specific angle is set, returned tuple is (angle, angle, 1.0)
+
+        Raises
+        ------
+        IndexError
+            If there's less layers in the stack than `pos`
+        """
+        return self.__layers[pos - 1]
 
     def calc(self,
              qty: Quantity,
              M: InMatrix2x2 = ((1, 0), (0, 1)),
-             thetas: Optional[List[Union[Angle, None]]] = None) -> Result:
+             thetas: Optional[List[Union[Angle, None]]] = None) -> CalcResult:
         """
         Calculates specified quantity for a given system under given constraints
 
@@ -154,7 +243,7 @@ class Heterostructure:
     def opt(self,
             qty: Quantity = Quantity.MaxStrainElement,
             max_el: int = 6,
-            max_supercell_size: Optional[float] = None) -> Result:
+            max_supercell_size: Optional[float] = None) -> CalcResult:
         """
         Minimises strain measure quantity, and calculates its value
 
@@ -187,9 +276,8 @@ class Heterostructure:
     def plot(self,
              qty: Quantity,
              max_el: int,
-             Ms: List[Union[InMatrix2x2, None]],
              thetas: List[Union[InMatrix2x2, None]]
-             ) -> List[(float)]:
+             ) -> PlotResult:
         raise NotImplementedError
 
 

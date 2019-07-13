@@ -1,4 +1,7 @@
-from .lattice import Lattice
+from typing import Tuple, Dict, List
+
+from .lattice import Lattice, Atom
+from .physics import Quantity, Angle, Matrix2x2
 
 
 class MetaInformation:
@@ -17,8 +20,8 @@ class MetaInformation:
         version of the supercell package used
     """
 
-    supercell_in: str = ""
-    runtime: float = 0.0
+    supercell_in: str
+    runtime: float
     supercell_version: str = "0.0.1"
 
     def __init__(self):
@@ -77,12 +80,28 @@ class LayerInformation(LatticeInformation):
 
 class Result:
     """
-    A class representing results of the calculation
+    A class containing results of supercell calculations
 
     Attributes
     ----------
     meta : MetaInformation
         Contains information on the calculation itself (see: MetaInformation)
+    heterostructure_object : Heterostructure
+        Heterostructure object whose method generated this results container
+    qty_desc : Quantity
+        Enumerated value representing quantity under study (see: Quantity)
+    """
+    meta : MetaInformation
+    heterostructure_object : "Heterostructure"
+    qty_desc : Quantity
+
+
+class CalcResult(Result):
+    """
+    A class representing results of Heterostructure calculation `opt` or `calc`
+
+    Attributes
+    ----------
     substrate : LatticeInformation
         Object containing results regarding the substrate
     layers : List[LayerInformation]
@@ -91,10 +110,6 @@ class Result:
         the layer closest to the substrate
     supercell : Lattice
         Lattice object representing lattice of a heterostructure under study
-    heterostructure_object : Heterostructure
-        Heterostructure object whose method generated this results container
-    qty_desc : Quantity
-        Enumerated value representing quantity under study (see: Quantity)
     qty : float
         Aggregated value of quantity `qty_desc`. This value should be minimal
         under constraints given to the `opt` function that generated this Result
@@ -108,6 +123,10 @@ class Result:
         Note: to save resulting heterostructure lattice in a format readable
         by other programs such as VASP or QE use methods of supercell attribute
     """
+    substrate : LatticeInformation
+    layers : List[LayerInformation]
+    supercell : Lattice
+    qty : float
 
     def save_txt(self, filename: str) -> None:
         """
@@ -122,3 +141,92 @@ class Result:
         None
         """
         pass
+
+
+class PlotResult(Result):
+    """
+    A class containing results of `plot` calculations on heterostructure
+
+    Attributes
+    ----------
+    x_thetas : List[float]
+        List of thetas to serve as x values (in radians)
+    values : List[float]
+        List of specified quantity (see: `qty_desc`) values to serve as y values
+    supercell_base_matrices : List[2x2 matrix]
+        List of optimal supercell_base_matrices found, corresponding to
+        given `x_thetas`
+    all_thetas : List[List[float]]
+        List of lists; each inner list has length equal to the number of layers
+        in the heterostructure and contains optimal value of theta angle for
+        the given layer (given the constraints specified before execution)
+        (in radians)
+
+    Methods
+    -------
+    get_point(index : int) : (float, float)
+        Return pair (x_theta, value) corresponding to given index
+
+    iter() : (float, float)
+        Generator that yields subsequent points (see: `get_point`)
+
+    get_calc_params(index : int) : Dictionary
+        Returns a dictionary with keys ("qty", "M", "thetas") that can be
+        used by `Heterostructure.calc` method like so:
+        >>> from supercell_core import *
+        >>> h = heterostructure()
+        >>> ...
+        >>> plot_result = h.plot(...)
+        >>> theta_0_calc_result = h.calc(**plot_result.get_calc_params(0))
+
+    iter_calc_params() : Dictionary
+        Generator that yields subsequent parameters dictionaries, same as
+        those returned by `get_calc_params`
+
+    Notes
+    -----
+    It is guaranteed that all list attributes have equal length.
+    You can use len() on objects of this class to get this length easily.
+    """
+    x_thetas : List[Angle]
+    values : List[float]
+    supercell_base_matrices : List[Matrix2x2]
+    all_thetas = List[List[Angle]]
+
+    def __len__(self):
+        return len(self.x_thetas)
+
+    def get_point(self, index: int) -> Tuple[float, float]:
+        """
+        Return pair (x_theta, value) corresponding to given index
+
+        Parameters
+        ----------
+        index : int
+
+        Returns
+        -------
+        Tuple[float, float]
+            (x (angle in radians), y (qty value))
+
+        Raises
+        ------
+        IndexError
+            First index is always 0. Use len(plot_result) to get maximum index.
+        """
+        return self.x_thetas[index], self.values[index]
+
+    def iter(self) -> Tuple[float, float]:
+        for i in range(len(self.x_thetas)):
+            yield self.get_point(i)
+
+    def get_calc_params(self, index: int) -> Dict:
+        return {
+            "qty": self.qty_desc,
+            "M": self.supercell_base_matrices[index],
+            "thetas": self.all_thetas
+        }
+
+    def iter_calc_params(self) -> Dict:
+        for i in range(len(self.x_thetas)):
+            yield self.get_calc_params(i)

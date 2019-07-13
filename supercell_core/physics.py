@@ -3,7 +3,7 @@ This file contains names of various physical qties, objects, units etc.
 and their mapping to values used in the calculations
 """
 
-from typing import Union, Sequence
+from typing import Union, Sequence, List, Tuple
 from enum import Enum, auto
 import numpy as np
 
@@ -17,6 +17,26 @@ VectorLike = Sequence[Number]
 
 # Type aliases for spatial vectors returned from public functions
 VectorNumpy = np.ndarray
+
+# Type alias for an angle
+Angle = Number
+
+# Type aliases for range of angles
+AngleRange = Tuple[Angle, Angle, Angle]
+
+# Type alias for immutable representation of 2x2 matrix
+TupleMatrix2x2 = Tuple[Tuple[Number, Number], Tuple[Number, Number]]
+
+# Type alias for mutable represenation of 2x2 matrix
+ListMatrix2x2 = List[List[Number]]
+
+# Type alias for Numpy 2x2 array (used internally to represent 2D square matrices)
+# note: no support on dimensionality and ndarray dtype typing available yet
+Matrix2x2 = np.ndarray
+
+# Type alias for a description of 2D square matrix that can be entered into
+# a public method
+InMatrix2x2 = Union[TupleMatrix2x2, Matrix2x2, ListMatrix2x2]
 
 DEGREE = (2 * np.pi) / 360
 
