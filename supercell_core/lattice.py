@@ -144,8 +144,11 @@ class Lattice:
         """
         return np.linalg.inv(self.__XA) @ pos
 
-    def add_atom(self, element: str, pos: VectorLike, spin: VectorLike = (0, 0, 0),
-                 unit: Unit = Unit.Angstrom) -> None:
+    def add_atom(self, element: str,
+                 pos: VectorLike,
+                 spin: VectorLike = (0, 0, 0),
+                 unit: Unit = Unit.Angstrom,
+                 normalise_positions: bool = False) -> None:
         """
         Adds a single atom to the unit cell of the lattice
         Parameters
@@ -162,6 +165,10 @@ class Lattice:
         unit : Unit
             Gives unit in which `pos` was given (must be either Unit.ANGSTROM
             or Unit.CRYSTAL)
+        normalise_positions : bool
+            If True, atomic positions are moved to be within the elementary cell
+            (preserving location of atoms in the whole crystal)
+            Default: False
 
         Returns
         -------
@@ -171,8 +178,8 @@ class Lattice:
         -----
         UserWarning
             If an unknown chemical element symbol is passed as `element`
-            If the atomic position is outside the box defined by unit cell
-             vectors.
+            If the atomic position is outside the elementary cell defined by
+            lattice vectors, and `normalise_positions` is False
 
         Raises
         ------
@@ -197,8 +204,13 @@ class Lattice:
         if unit == Unit.Angstrom:
             pos = self.__to_crystal_base(pos)
 
-        if not ((0 <= pos).all() and (pos < 1).all()):
+        if (not ((0 <= pos).all() and (pos < 1).all())) \
+                and not normalise_positions:
             warnings.warn(Warning.AtomOutsideElementaryCell.value)
+
+        if normalise_positions:
+            # move all positions to be within the elementary cell
+            pos %= 1.0
 
         self.__atoms.append((element, pos, spin))
 
