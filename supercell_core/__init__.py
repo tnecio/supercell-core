@@ -1,5 +1,5 @@
-from .input_parsers import read_POSCAR, read_supercell_in
+from .input_parsers import read_POSCAR, parse_POSCAR, read_supercell_in
 from .lattice import Atom, lattice
 from .heterostructure import heterostructure
-from .physics import VectorNumpy, VectorNumpy, VectorLike, Unit, Quantity, DEGREE, PERIODIC_TABLE,\
-    element_symbol
+from .physics import VectorNumpy, VectorNumpy, VectorLike, Unit, Quantity, DEGREE, PERIODIC_TABLE, \
+    element_symbol, Z_SPIN_DOWN, Z_SPIN_UP

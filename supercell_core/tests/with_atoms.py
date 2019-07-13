@@ -1,13 +1,15 @@
 import unittest as ut
 import numpy as np
 
+from ..lattice import Atom
+
 class TestCaseWithAtoms(ut.TestCase):
     """
     Special extension to unittest.TestCase to handle comparisons wiht atoms
     If Atom becomes a class in its own right with __eq__ implemented, this
     TestCase subclass might be removed
     """
-    def assertAtomsEqual(self, a1, a2):
+    def assertAtomsEqual(self, a1: Atom, a2: Atom) -> None:
         if len(a1) == 3:
             el1, pos1, spin1 = a1
         elif len(a1) == 2:
@@ -26,7 +28,7 @@ class TestCaseWithAtoms(ut.TestCase):
 
         self.assertEqual(el1, el2)
         self.assertEqual(spin1, spin2)
-        self.assertTrue(np.all(pos1 == pos2))
+        self.assertTrue(np.allclose(pos1, pos2))
 
     def testSelf(self):
         a = ("H", (0, 1, 0))

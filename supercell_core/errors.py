@@ -28,6 +28,12 @@ class UndefinedBehaviourError(Exception):
     """
     pass
 
+class ParseError(Exception):
+    """
+    An exception thrown when incorrect data are passed to parsing or reading
+    functions
+    """
+    pass
 
 class Warning(Enum):
     """
