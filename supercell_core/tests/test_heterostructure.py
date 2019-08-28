@@ -8,7 +8,7 @@ import supercell_core as sc
 
 class TestHeterostructure(ut.TestCase):
     """
-    Test of the Heterostructure class
+    Test of the Heterostructure and Result classes
     """
 
     def test_substrate(self):

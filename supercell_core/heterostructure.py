@@ -1,4 +1,4 @@
-from typing import Optional, List, Callable, Any
+from typing import Optional, List
 import itertools
 
 from .lattice import Lattice

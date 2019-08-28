@@ -1,8 +1,8 @@
-from typing import Tuple, List
+from typing import List
 import numpy as np
 
 from .lattice import Lattice
-from .physics import Angle, Matrix2x2, VectorNumpy
+from .physics import Angle, Matrix2x2
 from .calc import inv
 
 
