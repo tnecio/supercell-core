@@ -266,8 +266,8 @@ class Heterostructure:
     ### CALC METHODS
 
     def calc(self,
-             M: InMatrix2x2 = ((1, 0), (0, 1)),
-             thetas: Optional[List[Union[Angle, None]]] = None) -> Result:
+             M=((1, 0), (0, 1)),
+             thetas=None) -> Result:
         """
         Calculates strain tensor and other properties of the system in given
         circumstances
@@ -321,8 +321,6 @@ class Heterostructure:
         [1] https://en.wikipedia.org/wiki/Infinitesimal_strain_theory
 
         """
-        # TODO: test
-
         if thetas is not None:
             thetas = [arg if arg is not None else lay_desc[1][0]
                       for arg, lay_desc in zip(thetas, self.__layers)]
@@ -367,7 +365,7 @@ class Heterostructure:
         strain_tensors_wiki = [Heterostructure.__get_strain_tensor_wiki(XXt)
                                for XXt in XXts]
 
-        superlattice = self.__build_superlattice(XA @ ADt, BrDts)
+        superlattice = self.__build_superlattice(XA @ ADt, ADt, BrDts)
 
         return Result(
             self,
@@ -407,7 +405,8 @@ class Heterostructure:
         F -= np.identity(2)
         return F
 
-    def __build_superlattice(self, XDt: Matrix2x2, BrDts: List[Matrix2x2]) -> Lattice:
+    def __build_superlattice(self, XDt: Matrix2x2, ADt: Matrix2x2,
+                             BrDts: List[Matrix2x2]) -> Lattice:
         """
         Creates Lattice object describing superlattice (supercell)
         of the heterostructure
@@ -415,15 +414,17 @@ class Heterostructure:
         Parameters
         ----------
         XDt : Matrix2x2
+        ADt : Matrix2x2
         BrDts : List[Matrix2x2]
 
         Returns
         -------
         Lattice
         """
-        # TODO: test
         res = Lattice()
+        # We also need to include substrate here
         lattices = [self.__substrate] + [lay_desc[0] for lay_desc in self.__layers]
+        MDts = [ADt] + BrDts
 
         # lattice vectors
         full_XDt = np.zeros((3, 3))
@@ -432,23 +433,23 @@ class Heterostructure:
         res.set_vectors(*full_XDt.T.tolist())
 
         # atoms
-        for i, lay, BrDt in zip(range(len(BrDts)), lattices, BrDts):
+        for i, lay, MDt in zip(range(len(lattices)), lattices, MDts):
             # We stack the layers one above the other so atoms must be moved up
             # by the sum of z-sizes of all elementary cells of layers below
             z_offset = self.__get_z_offset(i)
             z_offset /= full_XDt[2, 2]  # angstrom -> Direct coordinates
-            Heterostructure.__superlattice_add_atoms(res, lay, BrDt, z_offset)
+            Heterostructure.__superlattice_add_atoms(res, lay, MDt, z_offset)
 
         return res
 
     @staticmethod
-    def __superlattice_add_atoms(superlattice, lay, BrDt, z_offset):
+    def __superlattice_add_atoms(superlattice, lay, MDt, z_offset):
         """
-        Adds atom from a given heterostructure layer to the superlattice.
-        To do this, atomic positions must be transformed to occupy the same
-        positions in the "stretched" elementary cell; and atoms themselves
-        must be copied a few times because one superlattice cell is composed
-        of a few layer cells.
+        Adds atoma from a given heterostructure-embedded lattice to the super-
+        lattice. To do this, atomic positions must be transformed to occupy 
+        the same positions in the "stretched" elementary cell; and atoms 
+        themselves must be copied a few times because one superlattice cell is 
+        composed of a few layer cells.
 
         Parameters
         ----------
@@ -456,7 +457,7 @@ class Heterostructure:
             Superlattice to modify
         lay : Lattice
             Layer of the heterostr.; Source of the atoms to add to superlattice
-        BrDt : Matrix 2x2
+        MDt : Matrix 2x2
         z_offset : float
             Describes how much above 0 in the supercell should be the layer
             `lay`. This value will be added to z-component of all atomic
@@ -467,13 +468,13 @@ class Heterostructure:
         None
         """
         # Safe upper bound on the size of the supercell in any direction
-        cell_upper_bound = 2 * int(round(np.max(np.abs(BrDt))) + 1)
+        cell_upper_bound = 2 * int(round(np.max(np.abs(MDt))) + 1)
 
         atoms = lay.atoms(unit=Unit.Crystal)
-        atomic_pos_Dt_basis = [inv(BrDt) @ atom[1][0:2] for atom in atoms]
+        atomic_pos_Dt_basis = [inv(MDt) @ atom[1][0:2] for atom in atoms]
 
         # vecs = 2x2 columns of DtBrt
-        DtBrt = inv(BrDt) @ inv(Heterostructure.__get_BtrBr(BrDt))
+        DtBrt = inv(MDt) @ inv(Heterostructure.__get_BtrBr(MDt))
         vecs = DtBrt.T[0:2, 0:2]
 
         # We will copy atoms many times, each time translated by some integer
@@ -500,6 +501,7 @@ class Heterostructure:
     def __get_z_offset(self, pos: int) -> float:
         """
         Return sum of z-sizes of lattices below specified position (in angstrom)
+        for `Heterostructure.__build_superlattice`
 
         Parameters
         ----------
@@ -511,11 +513,12 @@ class Heterostructure:
         float
             z-offset in Angstrom
         """
-        sub = self.__substrate
-        sub_z = sub.vectors()[2][2]
-        offset = sub_z
-        for lay in self.__layers[:pos]:
-            offset += lay[0].vectors()[2][2]
+        offset = 0
+        # We need to include substrate since we are also adding atoms from it
+        # ld == LayerDescription (Lattice, thetas)
+        lays = [self.__substrate] + [ld[0] for ld in self.__layers]
+        for lay in lays[:pos]:
+            offset += lay.vectors()[2][2]
         return offset
 
     @staticmethod
@@ -528,7 +531,7 @@ class Heterostructure:
 
     def opt(self,
             max_el: int = 6,
-            thetas: Optional[List[Union[Angle, AngleRange, None]]] = None
+            thetas=None
             ) -> Result:
         """
         Minimises strain, and calculates its value.
@@ -557,8 +560,6 @@ class Heterostructure:
             Result object containing the results of the optimisation.
             For more information see documentation of `Result`
         """
-        # TODO: test
-
         # Prepare ranges of theta values
         if thetas is not None:
             thetas = [arg if arg is not None else lay_desc[1]
@@ -747,7 +748,9 @@ class Heterostructure:
         thetas = list(thetas)
         new_res = (thetas, min_qty, XDt, min_st)
 
-        if (min_qty + ABS_EPSILON < res[1] or res[0]) is None:
+        # Here it is most efficient to check whether we aren't at the beginning
+        # (res[0] is None in that case)
+        if (min_qty + ABS_EPSILON < res[1]) or (res[0] is None):
             return new_res
 
         # 2. If qties are almost equal, choose smaller elementary cell

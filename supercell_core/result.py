@@ -110,12 +110,14 @@ class Result:
         -----
         The returned value is minimised in `Heterostructure.opt` calculations.
         """
-        return np.max(np.abs(np.sum(self.strain_tensors())))
+        # sum instead of np.sum because we want to add matrices in a list,
+        # not sum all elements of these matrices
+        return np.max(np.abs(sum(self.strain_tensors())))
 
     def M(self) -> Matrix2x2:
         """
-        Returns matrix M: M @ (v in supercell basis) = (v in substrate lattice
-        basis). All its components are integers.
+        Returns 2D matrix M: M @ (v in supercell basis) = (v in substrate lattice
+        basis). All matrix components are integers.
 
         Returns
         -------
