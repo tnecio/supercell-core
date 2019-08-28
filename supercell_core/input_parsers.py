@@ -7,7 +7,8 @@ from .heterostructure import Heterostructure
 
 def read_POSCAR(filename: str,
                 atomic_species: List[str],
-                magmom: Optional[str] = None) -> Lattice:
+                magmom: Optional[str] = None,
+                normalise_positions: Optional[bool] = False) -> Lattice:
     """
     Reads VASP input file "POSCAR"
 
@@ -20,6 +21,10 @@ def read_POSCAR(filename: str,
     magmom : str, optional
         Contents of the MAGMOM line from INCAR file.
         Default: all spins set to zero
+    normalise_positions : bool, optional
+        If True, atomic positions are moved to be within the elementary cell
+        (preserving location of atoms in the whole crystal)
+        Default: False
 
     Returns
     -------
@@ -39,7 +44,8 @@ def read_POSCAR(filename: str,
         # I don't think there is any reasonable POSCAR with > 1000 atoms
         # so s will be at most a few tens of thousands of kB, so just read() it
         s = f.read()
-    return parse_POSCAR(s, atomic_species, magmom)
+    return parse_POSCAR(s, atomic_species, magmom,
+                        normalise_positions=normalise_positions)
 
 # Helper functions for parser to make the code read better
 
@@ -74,7 +80,8 @@ def iter_magmom(magmom: str):
 
 def parse_POSCAR(poscar: str,
                  atomic_species: List[str],
-                 magmom: Optional[str] = None) -> Lattice:
+                 magmom: Optional[str] = None,
+                 normalise_positions: Optional[bool] = False) -> Lattice:
     """
     Reads lattice data from a string, treating it as VASP POSCAR file
     Format documentation: https://cms.mpi.univie.ac.at/wiki/index.php/POSCAR
@@ -89,6 +96,10 @@ def parse_POSCAR(poscar: str,
     magmom : str, optional
         Contents of the MAGMOM line from INCAR file.
         Default: all spins set to zero
+    normalise_positions : bool, optional
+        If True, atomic positions are moved to be within the elementary cell
+        (preserving location of atoms in the whole crystal)
+        Default: False
 
     Returns
     -------
@@ -159,7 +170,8 @@ def parse_POSCAR(poscar: str,
                 vec = [float(x) for x in get_line(s).split()]
                 if (len(vec) != 3):
                     raise ParseError("Vector length different than 3")
-                res.add_atom(specie, vec, next(spins), unit=unit)
+                res.add_atom(specie, vec, next(spins), unit=unit,
+                             normalise_positions=normalise_positions)
                 s = eat_line(s)
 
     except Exception as e:

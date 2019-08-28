@@ -2,8 +2,6 @@ import unittest as ut
 
 import supercell_core as sc
 
-from ..errors import *
-
 
 class TestHeterostructure(ut.TestCase):
     """
@@ -27,7 +25,7 @@ class TestHeterostructure(ut.TestCase):
         h = sc.heterostructure()
         lay = sc.lattice()
         lay.add_atom("H", (0, 0, 0))
-        h.add_layer(lay, theta=1*sc.DEGREE)
+        h.add_layer(lay, theta=1 * sc.DEGREE)
 
         lay2 = sc.lattice()
         lay2.add_atom("He", (0.1, 0.1, 0.1))
@@ -35,18 +33,18 @@ class TestHeterostructure(ut.TestCase):
 
         lay3 = sc.lattice()
         lay3.add_atom("Li", (0.2, 0.2, 0.2))
-        h.add_layer(lay3, theta=(0, 45*sc.DEGREE, 0.2*sc.DEGREE))
+        h.add_layer(lay3, theta=(0, 45 * sc.DEGREE, 0.2 * sc.DEGREE))
 
         lay4 = sc.lattice()
         lay4.add_atom("Be", (0.3, 0.3, 0.3))
-        lay4_index = h.add_layer(lay4, pos=2)
+        h.add_layer(lay4, pos=1)
 
         self.assertEqual(
             [lay, lay4, lay2, lay3],
             h.layers()
         )
 
-        h.remove_layer(lay4_index)
+        h.remove_layer(1)
 
         self.assertEqual(
             [lay, lay2, lay3],
@@ -55,9 +53,9 @@ class TestHeterostructure(ut.TestCase):
 
         h = sc.heterostructure()
         h.add_layers([
-            (lay, 1*sc.DEGREE),
+            (lay, 1 * sc.DEGREE),
             lay2,
-            (lay3, (0, 45*sc.DEGREE, 0.2*sc.DEGREE)),
+            (lay3, (0, 45 * sc.DEGREE, 0.2 * sc.DEGREE)),
             lay4
         ])
 
@@ -66,16 +64,28 @@ class TestHeterostructure(ut.TestCase):
             h.layers()
         )
 
-        got_lay = h.get_layer(1)
+        got_lay = h.get_layer(0)
 
         self.assertEqual(lay, got_lay[0])
-        self.assertEqual((1*sc.DEGREE, 1*sc.DEGREE, 1.0), got_lay[1])
+        self.assertEqual((1 * sc.DEGREE, 1 * sc.DEGREE, 1.0), got_lay[1])
 
         with self.assertRaises(IndexError):
             h.get_layer(10)
 
     def test_opt(self):
-        pass
+        # TODO: add reference to that book
+        sub = sc.lattice()
+        sub.set_vectors((1, 0), (0, 1))
+
+        lay = sc.lattice()
+        lay.set_vectors((1.41, 0), (0, 1.41))
+
+        h = sc.heterostructure()
+        h.set_substrate(sub)
+        h.add_layer(lay)
+
+        res = h.opt()
+        print(res.layers[0].strain_tensor)
 
     def test_calc(self):
         pass

@@ -3,6 +3,10 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+def readme():
+    with open('README.rst') as f:
+        return f.read()
+
 setuptools.setup(
     name='Supercell',
     version='0.0.1',
@@ -19,5 +23,6 @@ setuptools.setup(
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Topic :: Scientific/Engineering :: Physics"
-    ]
+    ],
+    include_package_data=True
 )

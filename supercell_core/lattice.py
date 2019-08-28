@@ -42,7 +42,7 @@ class Lattice:
         self.__atoms = []
 
     def set_vectors(self, *args: VectorLike,
-                    atoms_behaviour: Optional[Unit] = None) -> None:
+                    atoms_behaviour: Optional[Unit] = None) -> "Lattice":
         """
         Sets (or changes) lattice vectors to given values
 
@@ -66,7 +66,8 @@ class Lattice:
 
         Returns
         -------
-        None
+        Lattice
+            for chaining
 
         Raises
         -----
@@ -121,6 +122,8 @@ class Lattice:
                 self.__atoms[i] = (el, self.__to_crystal_base(old_XA @ old_pos),
                                    spin)
 
+        return self
+
     def vectors(self) -> List[VectorNumpy]:
         """
         Lists lattice vectors
@@ -131,6 +134,15 @@ class Lattice:
             List of unit cell vectors (in angstrom)
         """
         return self.__XA.T.tolist()
+
+    def base_change_matrix(self) -> np.ndarray:
+        """
+        # TODO doc, test
+        Returns
+        -------
+
+        """
+        return self.__XA
 
     def __to_angstrom_base(self, pos: np.ndarray) -> np.ndarray:
         """
@@ -148,7 +160,7 @@ class Lattice:
                  pos: VectorLike,
                  spin: VectorLike = (0, 0, 0),
                  unit: Unit = Unit.Angstrom,
-                 normalise_positions: bool = False) -> None:
+                 normalise_positions: bool = False) -> "Lattice":
         """
         Adds a single atom to the unit cell of the lattice
         Parameters
@@ -172,7 +184,8 @@ class Lattice:
 
         Returns
         -------
-        None
+        Lattice
+            for chaining
 
         Warns
         -----
@@ -213,8 +226,9 @@ class Lattice:
             pos %= 1.0
 
         self.__atoms.append((element, pos, spin))
+        return self
 
-    def add_atoms(self, atoms: List[Atom], unit: Unit = Unit.Angstrom) -> None:
+    def add_atoms(self, atoms: List[Atom], unit: Unit = Unit.Angstrom) -> "Lattice":
         """
         Adds atoms listed in `atoms` to the unit cell
 
@@ -227,10 +241,12 @@ class Lattice:
 
         Returns
         -------
-        None
+        Lattice
+            for chaining
         """
         for atom in atoms:
             self.add_atom(*atom, unit=unit)
+        return self
 
     def atoms(self, unit: Unit = Unit.Angstrom) -> List[Atom]:
         """
@@ -252,7 +268,7 @@ class Lattice:
             return [(el, self.__to_angstrom_base(pos), spin) for (el, pos, spin)
                     in self.__atoms]
 
-    def save_POSCAR(self, filename: Optional[str] = None) -> None:
+    def save_POSCAR(self, filename: Optional[str] = None) -> "Lattice":
         """
         Saves lattice structure in VASP POSCAR file.
         Order of the atomic species is the same as order of their first
@@ -268,13 +284,15 @@ class Lattice:
 
         Returns
         -------
-        None
+        Lattice
+            for chaining
         """
+        # TODO: ensure proper chirality
         # let's use 1.0 as scaling constant for simplicity
         s = "supercell_generated_POSCAR\n1.0\n"
 
         # lattice vectors
-        lattice_vectors = flatten_rect_array(self.__XA.T)
+        lattice_vectors = self.__XA.T.flatten().tolist()
         for i, val in enumerate(lattice_vectors):
             s += "{:.5g}".format(val) + " "
             if i % 3 == 2:
@@ -338,7 +356,7 @@ class Lattice:
                                for x in magmom])
         print("MAGMOM flag: " + magmom_str)
 
-    def save_xsf(self, filename: Optional[str] = None) -> None:
+    def save_xsf(self, filename: Optional[str] = None) -> "Lattice":
         """
         Saves lattice structure in XCrysDen XSF file
         Parameters
@@ -348,12 +366,13 @@ class Lattice:
 
         Returns
         -------
-        None
+        Lattice
+            for chaining
         """
         s = "CRYSTAL\n\nPRIMVEC\n"
 
         # lattice vectors
-        lattice_vectors = flatten_rect_array(self.__XA.T)
+        lattice_vectors = self.__XA.T.flatten().tolist()
         for i, val in enumerate(lattice_vectors):
             s += "{:.5g}".format(val) + " "
             if i % 3 == 2:
@@ -384,6 +403,10 @@ class Lattice:
             return 0
         else:
             return atom[2][2]
+
+    def draw(self):
+        # TODO
+        pass
 
 
 def lattice():

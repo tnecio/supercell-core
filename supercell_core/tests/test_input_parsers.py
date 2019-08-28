@@ -57,6 +57,7 @@ Cartesian
         self.assertEqual(len(lay.atoms()), 1)
 
     # TODO: test bad POSCARs
+    # TODO: test magmoms
 
     def test_supercell_in(self):
         pass
