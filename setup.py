@@ -3,9 +3,11 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+
 def readme():
     with open('README.rst') as f:
         return f.read()
+
 
 setuptools.setup(
     name='Supercell',

@@ -57,6 +57,7 @@ PERIODIC_TABLE = (
 Z_SPIN_UP = (0, 0, 1)
 Z_SPIN_DOWN = (0, 0, -1)
 
+
 def element_symbol(atomic_no: int) -> str:
     """
     Returns symbol of a chemical element given its atomic number
@@ -115,20 +116,3 @@ class Unit(Enum):
     """
     Angstrom = auto()
     Crystal = auto()
-
-
-class Quantity(Enum):
-    """
-    Enumeration representing different quantities measuring the quality of
-    a heterostructure supercell
-
-    Attributes
-    ----------
-    Strain
-        :math:`||\varepsilon - I||_2` where :math:`\varepsilon` is strain tensor
-    MaxStrainElement
-        :math:`\max_{ij} |\varepsilon - I|_{ij}` where :math:`\varepsilon`
-         is strain tensor
-    """
-    Strain = auto()
-    MaxStrainElement = auto()

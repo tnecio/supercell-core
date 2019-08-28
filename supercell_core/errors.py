@@ -28,6 +28,7 @@ class UndefinedBehaviourError(Exception):
     """
     pass
 
+
 class ParseError(Exception):
     """
     An exception thrown when incorrect data are passed to parsing or reading
@@ -35,7 +36,8 @@ class ParseError(Exception):
     """
     pass
 
-class Warning(Enum):
+
+class WarningText(Enum):
     """
     Enumeration that contains warning messages text
 

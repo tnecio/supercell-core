@@ -37,7 +37,7 @@ class TestLattice(TestCaseWithAtoms):
         # When z-component is non '0' but the 3rd vector is left default,
         # (which means it's unclear whether 'z' direction is important for
         # the user) a warning should be issued
-        with self.assertWarns(UserWarning, msg=Warning.ZComponentWhenNoZVector):
+        with self.assertWarns(UserWarning, msg=WarningText.ZComponentWhenNoZVector):
             lay.set_vectors([2, 3, 0], [1, 5, 0.2])
             self.assertEqual(lay.vectors(), [[2, 3, 0], [1, 5, 0.2], [0, 0, 1]])
 
@@ -49,7 +49,7 @@ class TestLattice(TestCaseWithAtoms):
         # think it is?
         lay = sc.lattice()
         lay.set_vectors([1, 0, 1], [0, 1, 1], [0, 0, 1])
-        with self.assertWarns(UserWarning, msg=Warning.ReassigningPartOfVector):
+        with self.assertWarns(UserWarning, msg=WarningText.ReassigningPartOfVector):
             lay.set_vectors([2, 0], [0, 3])
 
     def test_vectors_bad(self) -> None:
@@ -120,11 +120,11 @@ class TestLattice(TestCaseWithAtoms):
                               ("Be", np.array([0.5, 0.5, 0]), (0, 0, 1)))
 
         # When atom is outside the elementary cell, a warning should be logged
-        with self.assertWarns(UserWarning, msg=Warning.AtomOutsideElementaryCell):
+        with self.assertWarns(UserWarning, msg=WarningText.AtomOutsideElementaryCell):
             lay.add_atom("C", (2, 0, 0))
 
         # Element symbol not in the periodic table
-        with self.assertWarns(UserWarning, msg=Warning.UnknownChemicalElement):
+        with self.assertWarns(UserWarning, msg=WarningText.UnknownChemicalElement):
             lay.add_atom("Helium", (1, 0, 0))  # should be: "He"
 
         # Add atom using crystal units
@@ -168,7 +168,7 @@ class TestLattice(TestCaseWithAtoms):
         # Test bad type of values passed to function
         with self.assertRaises(TypeError):
             # Bad length of atomic position vector
-            lay.add_atom("O", (0))
+            lay.add_atom("O", 0)
             lay.add_atom("O", (1, 2, 3, 4))
 
             # Bad number of arguments to add atom

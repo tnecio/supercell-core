@@ -2,7 +2,7 @@ from typing import List, Optional, Tuple, Union
 
 from .errors import *
 from .calc import *
-from .physics import Unit, Number, VectorLike, VectorNumpy, PERIODIC_TABLE,\
+from .physics import Unit, Number, VectorLike, VectorNumpy, PERIODIC_TABLE, \
     atomic_number
 
 # Type alias for specifying atom element symbol (should be one of the strings
@@ -100,9 +100,9 @@ class Lattice:
             if len(v) < 2 or len(v) > 3:
                 raise TypeError("Expected 2D or 3D vectors")
             if len(v) == 2 and self.__XA[2, i] != 0:
-                warnings.warn(Warning.ReassigningPartOfVector.value)
+                warnings.warn(WarningText.ReassigningPartOfVector.value)
             if len(v) == 3 and v[2] != 0 and len(args) == 2:
-                warnings.warn(Warning.ZComponentWhenNoZVector.value)
+                warnings.warn(WarningText.ZComponentWhenNoZVector.value)
         if (not isinstance(atoms_behaviour, Unit)) and len(self.__atoms) > 0:
             raise UndefinedBehaviourError
 
@@ -135,12 +135,14 @@ class Lattice:
         """
         return self.__XA.T.tolist()
 
-    def base_change_matrix(self) -> np.ndarray:
+    def basis_change_matrix(self) -> np.ndarray:
         """
-        # TODO doc, test
+        Returns basis change matrix from basis of lattice vectors (Direct) to
+        Cartesian basis.
+
         Returns
         -------
-
+        np.ndarray, shape (3,3)
         """
         return self.__XA
 
@@ -163,6 +165,7 @@ class Lattice:
                  normalise_positions: bool = False) -> "Lattice":
         """
         Adds a single atom to the unit cell of the lattice
+
         Parameters
         ----------
         element : str
@@ -201,7 +204,7 @@ class Lattice:
         """
         # check correctness of input data
         if element not in PERIODIC_TABLE:
-            warnings.warn(Warning.UnknownChemicalElement.value)
+            warnings.warn(WarningText.UnknownChemicalElement.value)
 
         if len(pos) == 2:
             pos = [pos[0], pos[1], 0]
@@ -219,7 +222,7 @@ class Lattice:
 
         if (not ((0 <= pos).all() and (pos < 1).all())) \
                 and not normalise_positions:
-            warnings.warn(Warning.AtomOutsideElementaryCell.value)
+            warnings.warn(WarningText.AtomOutsideElementaryCell.value)
 
         if normalise_positions:
             # move all positions to be within the elementary cell
@@ -326,7 +329,7 @@ class Lattice:
             # while we're at it, we can also already sort atomic_species[name]
             # by their atoms' z-spin (useful for calculating the MAGMOM flag)
             # reverse=True, so spin up (1) is before down (-1), matter of pref.
-            atomic_species[name].sort(key = self.__z_spin, reverse=True)
+            atomic_species[name].sort(key=self.__z_spin, reverse=True)
 
             for atom in atomic_species[name]:
                 try:
@@ -348,13 +351,15 @@ class Lattice:
         else:
             print(s)
 
-        print("Note: The order of the atomic species in this generated " + \
+        print("Note: The order of the atomic species in this generated " +
               "POSCAR file is as follows:\n" + " ".join(names))
 
         # magmom
         magmom_str = " ".join([((str(x[1]) + "*" if x[1] > 1 else "") + str(x[0]))
                                for x in magmom])
         print("MAGMOM flag: " + magmom_str)
+
+        return self
 
     def save_xsf(self, filename: Optional[str] = None) -> "Lattice":
         """
@@ -398,8 +403,11 @@ class Lattice:
         else:
             print(s, end='')
 
-    def __z_spin(self, atom: Atom) -> Number:
-        if (len(atom) == 2):
+        return self
+
+    @staticmethod
+    def __z_spin(atom: Atom) -> Number:
+        if len(atom) == 2:
             return 0
         else:
             return atom[2][2]

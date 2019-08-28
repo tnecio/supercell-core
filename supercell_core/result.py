@@ -2,8 +2,9 @@ from typing import Tuple, List
 import numpy as np
 
 from .lattice import Lattice
-from .physics import Quantity, Angle, Matrix2x2, VectorNumpy
+from .physics import Angle, Matrix2x2, VectorNumpy
 from .calc import inv
+
 
 class Result:
     """
@@ -37,17 +38,21 @@ class Result:
 
     Note that the vector space of all the mentioned objects is R^2
     """
-    __heterostructure : "Heterostructure"
-    __superlattice : Lattice
-    __thetas : List[Angle]
-    __strain_tensors : List[Matrix2x2]
+    __heterostructure: "Heterostructure"
+    __superlattice: Lattice
+    __thetas: List[Angle]
+    __strain_tensors: List[Matrix2x2]
+    __ADt: Matrix2x2
+    __ABtrs: List[Matrix2x2]
 
     def __init__(self,
                  heterostructure: "Heterostructure",
                  superlattice: Lattice,
                  thetas: List[Angle],
                  strain_tensors: List[Matrix2x2],
-                 strain_tensors_wiki: List[Matrix2x2]):
+                 strain_tensors_wiki: List[Matrix2x2],
+                 ADt: Matrix2x2,
+                 ABtrs: List[Matrix2x2]):
         """
 
         Parameters
@@ -58,12 +63,16 @@ class Result:
         strain_tensors : List[Matrix2x2]
             in cartesian basis
         strain_tensors_wiki : List[Matrix2x2]
+        ADt : Matrix2x2
+        ABtrs : List[Matrix2x2]
         """
         self.__heterostructure = heterostructure
         self.__superlattice = superlattice
         self.__thetas = thetas
         self.__strain_tensors = strain_tensors
         self.__strain_tensors_wiki = strain_tensors_wiki
+        self.__ADt = ADt
+        self.__ABtrs = ABtrs
 
     def strain_tensors(self, wiki_definition=False) -> \
             List[Matrix2x2]:
@@ -103,63 +112,57 @@ class Result:
         """
         return np.max(np.abs(np.sum(self.strain_tensors())))
 
-    def BtrBrs(self) -> Matrix2x2:
+    def M(self) -> Matrix2x2:
         """
+        Returns matrix M: M @ (v in supercell basis) = (v in substrate lattice
+        basis). All its components are integers.
 
         Returns
         -------
-
+        Matrix2x2
         """
-        # TODO
-        pass
+        return self.__ADt
 
-    def BtrDts(self) -> Matrix2x2:
+    def layer_Ms(self) -> List[Matrix2x2]:
         """
+        Returns list of matrices Mi: Mi @ (v in supercell basis) = (v in basis
+        of heterostructure layer no. i when it is stretched due to strain).
+        All matrix components are integers.
 
         Returns
         -------
-
+        Matrix2x2
         """
-        # TODO
-        pass
+        return [inv(ABtr) @ self.__ADt for ABtr in self.__ABtrs]
 
     def atom_count(self) -> int:
         """
+        Returns number of atoms in the superlattice elementary cell
 
         Returns
         -------
-
+        int
         """
-        # TODO doc
         return len(self.superlattice().atoms())
 
     def superlattice(self) -> Lattice:
         """
+        Returns a Lattice object representing supercell (elementary cell
+        of the heterostructure)
 
         Returns
         -------
-
+        Lattice
         """
-        # TODO doc
         return self.__superlattice
-
-    def layers_lattice_vectors(self) -> \
-        List[Tuple[VectorNumpy, VectorNumpy, VectorNumpy]]:
-        """
-
-        Returns
-        -------
-
-        """
-        # TODO
-        pass
 
     def thetas(self) -> List[Angle]:
         """
+        Returns list of theta values corresponding to the layers
+        in the heterostructure. (in radians)
 
         Returns
         -------
-
+        List[float]
         """
-        # TODO doc
         return self.__thetas

@@ -1,10 +1,7 @@
 import unittest as ut
 
-import supercell_core as sc
-
-from ..errors import *
-
 from ..calc import *
+
 
 class TestCalc(ut.TestCase):
     def test_inv(self):
@@ -32,7 +29,6 @@ class TestCalc(ut.TestCase):
         actual = matvecmul(m1, m2)
         self.assertTrue(np.allclose(expected, actual))
 
-
     def test_rotate(self):
         a = 3
         theta = np.random.random()
@@ -43,7 +39,7 @@ class TestCalc(ut.TestCase):
                 for k in range(a):
                     for l in range(a):
                         expected[i, j, k, l] = np.array([[np.cos(theta), -np.sin(theta)],
-                     [np.sin(theta), np.cos(theta)]]) @ m[i, j, k, l]
+                                                         [np.sin(theta), np.cos(theta)]]) @ m[i, j, k, l]
         actual = rotate(m, theta)
         self.assertTrue(np.allclose(expected, actual))
 

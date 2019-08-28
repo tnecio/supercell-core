@@ -7,8 +7,6 @@ from .result import *
 from .calc import *
 
 
-# TODO: decide on matrices notation
-
 class Heterostructure:
     """
     Class describing a system of a number of 2D crystals deposited
@@ -355,14 +353,15 @@ class Heterostructure:
             see `Result` documentation for details
         """
 
-        XA = self.__substrate.base_change_matrix()[0:2, 0:2]
-        XBrs = [rotate(lay_desc[0].base_change_matrix()[0:2, 0:2], theta)
+        XA = self.__substrate.basis_change_matrix()[0:2, 0:2]
+        XBrs = [rotate(lay_desc[0].basis_change_matrix()[0:2, 0:2], theta)
                 for theta, lay_desc in zip(thetas, self.__layers)]
         BrDts = [inv(XBr) @ XA @ ADt for XBr in XBrs]
         BtrBrs = [Heterostructure.__get_BtrBr(BrDt) for BrDt in BrDts]
         XXts = [XBr @ inv(BtrBr) @ inv(XBr) for XBr, BtrBr in zip(XBrs, BtrBrs)]
         strain_tensors = [Heterostructure.__calc_strain_tensor(XBr, XXt)
                           for XBr, XXt in zip(XBrs, XXts)]
+        ABtrs = [inv(XA) @ XBr @ inv(BtrBr) for XBr, BtrBr in zip(XBrs, BtrBrs)]
 
         # also add the alternative strain tensor definition to the Result
         strain_tensors_wiki = [Heterostructure.__get_strain_tensor_wiki(XXt)
@@ -375,7 +374,9 @@ class Heterostructure:
             superlattice,
             thetas,
             strain_tensors,
-            strain_tensors_wiki
+            strain_tensors_wiki,
+            ADt,
+            ABtrs
         )
 
     @staticmethod
@@ -427,7 +428,7 @@ class Heterostructure:
         # lattice vectors
         full_XDt = np.zeros((3, 3))
         full_XDt[0:2, 0:2] = XDt
-        full_XDt[0:3, 2] = sum([lay.base_change_matrix()[2, 0:3] for lay in lattices])
+        full_XDt[0:3, 2] = sum([lay.basis_change_matrix()[2, 0:3] for lay in lattices])
         res.set_vectors(*full_XDt.T.tolist())
 
         # atoms
@@ -472,7 +473,7 @@ class Heterostructure:
         atomic_pos_Dt_basis = [inv(BrDt) @ atom[1][0:2] for atom in atoms]
 
         # vecs = 2x2 columns of DtBrt
-        DtBrt = inv(BrDt) @ inv(Heterostructure.__get_BtrBr(BrDt))  # TODO
+        DtBrt = inv(BrDt) @ inv(Heterostructure.__get_BtrBr(BrDt))
         vecs = DtBrt.T[0:2, 0:2]
 
         # We will copy atoms many times, each time translated by some integer
@@ -566,7 +567,7 @@ class Heterostructure:
             for theta in thetas:
                 try:
                     # assume theta is a triple of numbers
-                    if (len(theta) == 3):
+                    if len(theta) == 3:
                         theta_ranges.append(theta)
                     else:
                         raise AttributeError
@@ -746,7 +747,7 @@ class Heterostructure:
         thetas = list(thetas)
         new_res = (thetas, min_qty, XDt, min_st)
 
-        if min_qty + ABS_EPSILON < res[1] or res[0] == None:
+        if (min_qty + ABS_EPSILON < res[1] or res[0]) is None:
             return new_res
 
         # 2. If qties are almost equal, choose smaller elementary cell

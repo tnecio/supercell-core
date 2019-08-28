@@ -9,7 +9,7 @@ import numpy as np
 ABS_EPSILON = 1e-7
 
 
-def rotate(a : np.ndarray, theta : float) -> np.ndarray:
+def rotate(a: np.ndarray, theta: float) -> np.ndarray:
     """
     Rotates vectors stored in 2D matrices columns in array `a` by angle `theta`
     counterclockwise
@@ -24,7 +24,8 @@ def rotate(a : np.ndarray, theta : float) -> np.ndarray:
     np.ndarray
     """
     return np.array(((np.cos(theta), -np.sin(theta)),
-                            (np.sin(theta), np.cos(theta)))) @ a
+                     (np.sin(theta), np.cos(theta)))) @ a
+
 
 def matvecmul(m: np.ndarray, v: np.ndarray) -> np.ndarray:
     """
@@ -44,6 +45,7 @@ def matvecmul(m: np.ndarray, v: np.ndarray) -> np.ndarray:
     res[..., 1] = m[..., 1, 0] * v[..., 0] + m[..., 1, 1] * v[..., 1]
     return res
 
+
 def matmul(m1: np.ndarray, m2: np.ndarray) -> np.ndarray:
     """
     Calculates matrix multiplication of 2D matrices stored in arrays `m1` and `m2`
@@ -58,6 +60,7 @@ def matmul(m1: np.ndarray, m2: np.ndarray) -> np.ndarray:
     np.ndarray, shape(..., 2, 2)
     """
     return m1 @ m2
+
 
 def inv(m: np.ndarray) -> np.ndarray:
     """
@@ -76,10 +79,10 @@ def inv(m: np.ndarray) -> np.ndarray:
     """
     det_m = np.linalg.det(m)
     res = np.moveaxis(
-            (1.0 / det_m) * np.array(((m[..., 1, 1], -m[..., 0, 1]),
-                                      (-m[..., 1, 0], m[..., 0, 0]))),
-            (0, 1),
-            (-2, -1))
+        (1.0 / det_m) * np.array(((m[..., 1, 1], -m[..., 0, 1]),
+                                  (-m[..., 1, 0], m[..., 0, 0]))),
+        (0, 1),
+        (-2, -1))
     res[np.abs(det_m) < 1e-8] = np.nan
     return res
 
@@ -111,5 +114,5 @@ def matnorm(m: np.ndarray, p: float, q: float) -> np.ndarray:
     [1] https://en.wikipedia.org/wiki/Matrix_norm#L2,1_and_Lp,q_norms
     """
     return ((np.abs(m[..., 0, 0]) ** p + np.abs(m[..., 0, 1]) ** p) ** (q / p)
-          + (np.abs(m[..., 1, 0]) ** p + np.abs(m[..., 1, 1]) ** p) ** (q / p)) \
+            + (np.abs(m[..., 1, 0]) ** p + np.abs(m[..., 1, 1]) ** p) ** (q / p)) \
            ** (1 / q)

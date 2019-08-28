@@ -5,6 +5,7 @@ from .physics import Unit
 from .lattice import lattice, Lattice
 from .heterostructure import Heterostructure
 
+
 def read_POSCAR(filename: str,
                 atomic_species: List[str],
                 magmom: Optional[str] = None,
@@ -47,11 +48,13 @@ def read_POSCAR(filename: str,
     return parse_POSCAR(s, atomic_species, magmom,
                         normalise_positions=normalise_positions)
 
+
 # Helper functions for parser to make the code read better
 
 def eat_line(s: List[str]) -> List[str]:
     # Takes a list of lines, returns list without the first one
     return s[1:]
+
 
 def get_line(s: List[str]) -> str:
     # Returns first line in list
@@ -168,7 +171,7 @@ def parse_POSCAR(poscar: str,
         for specie, count in zip(atomic_species, as_counts):
             for i in range(count):
                 vec = [float(x) for x in get_line(s).split()]
-                if (len(vec) != 3):
+                if len(vec) != 3:
                     raise ParseError("Vector length different than 3")
                 res.add_atom(specie, vec, next(spins), unit=unit,
                              normalise_positions=normalise_positions)
@@ -177,6 +180,7 @@ def parse_POSCAR(poscar: str,
     except Exception as e:
         raise ParseError(str(e))
     return res
+
 
 def read_supercell_in(filename: str) -> Heterostructure:
     pass
