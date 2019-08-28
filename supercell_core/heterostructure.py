@@ -53,12 +53,6 @@ class Heterostructure:
     #                                    (0, 1 angstrom))
     #
     # Note that the vector space of all the mentioned objects is R^2
-    #
-    # See [1] for definition of strain tensor
-    #
-    # References
-    # ----------
-    # [2] https://en.wikipedia.org/wiki/Infinitesimal_strain_theory
 
     __layers: List[Tuple[Lattice, AngleRange]]
     __substrate: Lattice
