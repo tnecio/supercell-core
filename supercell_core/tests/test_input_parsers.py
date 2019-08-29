@@ -42,6 +42,43 @@ Direct
 
         self.assertEqual(len(lay.atoms()), 4)
 
+    def test_parse_POSCAR_2(self):
+        # This time with specie names, selective dynamics and initial velocities
+        example_poscar = """whatever
+1.0
+1 2 3
+0.5 0.7 0.91
+3 1 0
+1 3
+Selective dynamics 
+d
+-21.84 72 -4.72 T T F
+17.38 -54 3.54 F T F
+2.66 -8 0.48   F F T
+0 0 0 F F F
+
+0 0 0 
+1 2 3
+1.00000 2.000000 3.000000
+3.0 1 0.000"""
+
+        lay = sc.parse_POSCAR(example_poscar, ["Fe", "Zn"], magmom="2*-1 1 1*0")
+        # a hack around np.ndarray's lack of test-friendly __eq__
+        self.assertEqual([lay.vectors()[j][i] for j in range(3) for i in range(3)],
+                         [1, 2, 3, 0.5, 0.7, 0.91, 3, 1, 0])
+
+        atoms = [
+            ("Fe", (0, 2, 0), (0, 0, -1)),
+            ("Zn", (1, 0.5, 3), (0, 0, -1)),
+            ("Zn", (0.1, 0.2, 0.7), (0, 0, 1)),
+            ("Zn", (0, 0, 0), (0, 0, 0))
+        ]
+
+        for a1, a2 in zip(atoms, lay.atoms()):
+            self.assertAtomsEqual(a1, a2)
+
+        self.assertEqual(len(lay.atoms()), 4)
+
     def test_read_POSCAR_2(self):
         example_poscar = """ Si                                     
    1.00000000000000     
@@ -58,6 +95,7 @@ Cartesian
 
     # TODO: test bad POSCARs
     # TODO: test magmoms
+    # TODO: test correct IO
 
     def test_supercell_in(self):
         pass

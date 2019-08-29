@@ -142,18 +142,33 @@ def parse_POSCAR(poscar: str,
         res.set_vectors(*vecs)
 
         # 6: atomic species counts
+        line = get_line(s).split()
         as_counts = []
-        if len(get_line(s).split()) != len(atomic_species):
+        if len(line) != len(atomic_species):
             raise ParseError("Number of atomic species doesn't match ({} != {})".format(
                 len(get_line(s).split()), len(atomic_species)
             ))
+
+        # Note: VASP will output here (and read correctly) a line with names of
+        # the atomic species; This is an undocumented feature of VASP
+        # so files written by supercell_core don't contain this line; However,
+        # we must check if this line exist and if so, ommit it.
+        # (in the future we might check its contents against `atomic_species`)
+        try:
+            int(line[0])
+        except ValueError:
+            s = eat_line(s)
+
         for x in get_line(s).split():
             as_counts.append(int(x.strip()))
         s = eat_line(s)
 
-        # 7: possibly Selective Dynamics, then ignore the line
+        # 7: possibly Selective Dynamics, then remember to ignore Ts and Fs
+        # at the ends of positions # TODO: add test
+        selective_dynamics = False
         if get_line(s)[0] in "Ss":
             s = eat_line(s)
+            selective_dynamics = True
 
         # 8: Cartesian or Direct
         unit = Unit.Crystal
@@ -170,9 +185,16 @@ def parse_POSCAR(poscar: str,
 
         for specie, count in zip(atomic_species, as_counts):
             for i in range(count):
-                vec = [float(x) for x in get_line(s).split()]
-                if len(vec) != 3:
-                    raise ParseError("Vector length different than 3")
+                splitted = get_line(s).split()
+                vec = [float(x) for x in splitted[0:3]]
+                if selective_dynamics:
+                    if len(splitted) != 6:
+                        raise ParseError("Vector length different than 3, "
+                                        + "or bad number of selective dynamics "
+                                        + "flags")
+                else:
+                    if len(splitted) != 3:
+                        raise ParseError("Vector length different than 3")
                 res.add_atom(specie, vec, next(spins), unit=unit,
                              normalise_positions=normalise_positions)
                 s = eat_line(s)
