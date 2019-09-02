@@ -1,6 +1,7 @@
 from typing import Optional, List
 import itertools
 
+from .atom import Atom
 from .lattice import Lattice
 from .physics import *
 from .result import *
@@ -465,7 +466,7 @@ class Heterostructure:
         cell_upper_bound = 2 * int(round(np.max(np.abs(MDt))) + 1)
 
         atoms = lay.atoms(unit=Unit.Crystal)
-        atomic_pos_Dt_basis = [inv(MDt) @ atom[1][0:2] for atom in atoms]
+        atomic_pos_Dt_basis = [inv(MDt) @ atom.pos[0:2] for atom in atoms]
 
         # vecs = 2x2 columns of DtBrt
         DtBrt = inv(MDt) @ inv(Heterostructure.__get_BtrBr(MDt))
@@ -484,12 +485,12 @@ class Heterostructure:
 
         for pos, a in zip(atomic_pos_Dt_basis, atoms):
             for node in nodes:
-                atom = (a[0],
-                        (pos[0] + node[0],
-                         pos[1] + node[1],
-                         a[1][2] + z_offset),
-                        a[2])
-                superlattice.add_atom(*atom, unit=Unit.Crystal,
+                superlattice.add_atom(a.element,
+                                      (pos[0] + node[0],
+                                       pos[1] + node[1],
+                                       a.pos[2] + z_offset),
+                                      spin=a.spin,
+                                      unit=Unit.Crystal,
                                       normalise_positions=True)
 
     def __get_z_offset(self, pos: int) -> float:

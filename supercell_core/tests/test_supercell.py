@@ -6,6 +6,7 @@ class TestSupercell(ut.TestCase):
     """
     Test of the supercell_core interface as a whole
     """
+    # TODO: fix this, write how-tos for documentation
 
     def test_primary_use_case(self):
         """

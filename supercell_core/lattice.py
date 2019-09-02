@@ -4,12 +4,7 @@ from .errors import *
 from .calc import *
 from .physics import Unit, Number, VectorLike, VectorNumpy, PERIODIC_TABLE, \
     atomic_number
-
-# Type alias for specifying atom element symbol (should be one of the strings
-# from PERIODIC_TABLE), position in a lattice, and optionally its spin
-# in x, y, and z directions
-# (maybe move to its own class?)
-Atom = Union[Tuple[str, VectorLike], Tuple[str, VectorLike, VectorLike]]
+from .atom import Atom
 
 
 # noinspection PyPep8Naming
@@ -22,6 +17,9 @@ class Lattice:
 
     Elementary cell vectors are here and elsewhere referred to as b_1, b_2, b_3.
     """
+    # Let's keep atoms in a list not set, because most operations will be done
+    # probably on all atoms together anyway, except maybe for adding atoms;
+    # list doesn't really create any significant disadvantages over a set
     __atoms: List[Atom]
     __XA: np.ndarray
 
@@ -118,9 +116,10 @@ class Lattice:
 
         if atoms_behaviour == Unit.Angstrom:
             for i, a in enumerate(self.__atoms):
-                el, old_pos, spin = a
-                self.__atoms[i] = (el, self.__to_crystal_base(old_XA @ old_pos),
-                                   spin)
+                self.__atoms[i] = Atom(a.element,
+                                       self.__to_crystal_base(old_XA @ a.pos),
+                                       Unit.Crystal,
+                                       spin=a.spin)
 
         return self
 
@@ -158,10 +157,12 @@ class Lattice:
         """
         return np.linalg.inv(self.__XA) @ pos
 
-    def add_atom(self, element: str,
+    def add_atom(self,
+                 element: str,
                  pos: VectorLike,
                  spin: VectorLike = (0, 0, 0),
                  unit: Unit = Unit.Angstrom,
+                 velocity: VectorLike = (0, 0, 0),
                  normalise_positions: bool = False) -> "Lattice":
         """
         Adds a single atom to the unit cell of the lattice
@@ -202,6 +203,7 @@ class Lattice:
         TypeError
             If supplied arguments are of incorrect type
         """
+        # TODO: replace with Atom class constructor
         # check correctness of input data
         if element not in PERIODIC_TABLE:
             warnings.warn(WarningText.UnknownChemicalElement.value)
@@ -228,10 +230,10 @@ class Lattice:
             # move all positions to be within the elementary cell
             pos %= 1.0
 
-        self.__atoms.append((element, pos, spin))
+        self.__atoms.append(Atom(element, pos, Unit.Crystal, spin=spin))
         return self
 
-    def add_atoms(self, atoms: List[Atom], unit: Unit = Unit.Angstrom) -> "Lattice":
+    def add_atoms(self, atoms: List[Atom]) -> "Lattice":
         """
         Adds atoms listed in `atoms` to the unit cell
 
@@ -247,8 +249,9 @@ class Lattice:
         Lattice
             for chaining
         """
+        # TODO: use Atom constructor
         for atom in atoms:
-            self.add_atom(*atom, unit=unit)
+            self.add_atom(atom.element, atom.pos, spin=atom.spin, unit=atom.pos_unit)
         return self
 
     def atoms(self, unit: Unit = Unit.Angstrom) -> List[Atom]:
@@ -268,8 +271,8 @@ class Lattice:
         if unit == Unit.Crystal:
             return self.__atoms
         if unit == Unit.Angstrom:
-            return [(el, self.__to_angstrom_base(pos), spin) for (el, pos, spin)
-                    in self.__atoms]
+            return [atom.basis_change(self.__XA, Unit.Angstrom)
+                    for atom in self.__atoms]
 
     def save_POSCAR(self, filename: Optional[str] = None) -> "Lattice":
         """
@@ -307,10 +310,10 @@ class Lattice:
 
         for a in self.__atoms:
             try:
-                atomic_species[a[0]].append(a)
+                atomic_species[a.element].append(a)
             except KeyError:
-                atomic_species[a[0]] = [a]
-                names.append(a[0])
+                atomic_species[a.element] = [a]
+                names.append(a.element)
 
         for name in names:
             atoms_list = atomic_species[name]
@@ -342,7 +345,7 @@ class Lattice:
                     magmom.append((self.__z_spin(atom), 1))
 
                 # print atom position
-                s += "{:.5g} {:.5g} {:.5g}\n".format(*atom[1])
+                s += "{:.5g} {:.5g} {:.5g}\n".format(*atom.pos)
 
         # saving
         if filename is not None:
@@ -391,9 +394,9 @@ class Lattice:
         # atoms: 'atomic_number pos in angstroms (x y z) spin (x y z)
         for atom in self.atoms(unit=Unit.Angstrom):
             s += "{} {:.5g} {:.5g} {:.5g} {} {} {}\n".format(
-                atomic_number(atom[0]),
-                *atom[1],
-                *atom[2]
+                atomic_number(atom.element),
+                *atom.pos,
+                *atom.spin
             )
 
         # saving
@@ -407,14 +410,11 @@ class Lattice:
 
     @staticmethod
     def __z_spin(atom: Atom) -> Number:
-        if len(atom) == 2:
-            return 0
-        else:
-            return atom[2][2]
+        return atom.spin[2]
 
     def draw(self):
-        # TODO
         pass
+        # TODO
 
 
 def lattice():

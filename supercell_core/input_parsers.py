@@ -164,7 +164,7 @@ def parse_POSCAR(poscar: str,
         s = eat_line(s)
 
         # 7: possibly Selective Dynamics, then remember to ignore Ts and Fs
-        # at the ends of positions # TODO: add test
+        # at the ends of positions
         selective_dynamics = False
         if get_line(s)[0] in "Ss":
             s = eat_line(s)
@@ -183,6 +183,13 @@ def parse_POSCAR(poscar: str,
             # default spin: 0
             spins = iter([(0, 0, 0)] * sum(as_counts))
 
+        def letter_to_sd_bool(letter: str):
+            if letter == 'T':
+                return True
+            elif letter == 'F':
+                return False
+            raise ParseError("Bad selective dynamics flag")
+
         for specie, count in zip(atomic_species, as_counts):
             for i in range(count):
                 splitted = get_line(s).split()
@@ -192,6 +199,9 @@ def parse_POSCAR(poscar: str,
                         raise ParseError("Vector length different than 3, "
                                         + "or bad number of selective dynamics "
                                         + "flags")
+                    sd = tuple(map(letter_to_sd_bool,
+                                   [x.strip() for x in splitted[3:6]]))
+
                 else:
                     if len(splitted) != 3:
                         raise ParseError("Vector length different than 3")

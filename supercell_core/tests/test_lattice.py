@@ -1,16 +1,16 @@
 import os
 import numpy as np
+import unittest as ut
 
 from io import StringIO
 from unittest.mock import patch
 
 import supercell_core as sc
 
-from .with_atoms import TestCaseWithAtoms
 from ..errors import *
 
 
-class TestLattice(TestCaseWithAtoms):
+class TestLattice(ut.TestCase):
     """
     Test Lattice object
     """
@@ -101,23 +101,23 @@ class TestLattice(TestCaseWithAtoms):
         self.assertEqual(lay.atoms(), [])
 
         # Test add_atom Helium (default unit: angstrom)
-        he = ("He", (0.1, 0.2, 0.3))
-        lay.add_atom(*he)
-        self.assertAtomsEqual(lay.atoms()[0], he)
+        he = sc.Atom("He", (0.1, 0.2, 0.3))
+        lay.add_atom(he.element, he.pos)
+        self.assertEqual(lay.atoms()[0], he)
 
         # Test add_atoms: Hydrogen and Lithium
         # Retaining element order is expected
-        h, li = ("H", np.array([0, 0, 0])),\
-                ("Li", np.array([0.9, 0.9, 0.9]), (0, 1, 2))
+        h, li = sc.Atom("H", np.array([0, 0, 0])), \
+                sc.Atom("Li", np.array([0.9, 0.9, 0.9]), spin=(0, 1, 2))
         lay.add_atoms([h, li])
         for a1, a2 in zip(lay.atoms(), [he, h, li]):
-            self.assertAtomsEqual(a1, a2)
+            self.assertEqual(a1, a2)
 
         # Add atom using 2D position vector
-        be = ("Be", (0.5, 0.5), (0, 0, 1))
-        lay.add_atom(*be)
-        self.assertAtomsEqual(lay.atoms()[-1],
-                              ("Be", np.array([0.5, 0.5, 0]), (0, 0, 1)))
+        be = sc.Atom("Be", (0.5, 0.5), spin=(0, 0, 1))
+        lay.add_atoms([be])
+        self.assertEqual(lay.atoms()[-1],
+                         sc.Atom("Be", np.array([0.5, 0.5, 0]), spin=(0, 0, 1)))
 
         # When atom is outside the elementary cell, a warning should be logged
         with self.assertWarns(UserWarning, msg=WarningText.AtomOutsideElementaryCell):
@@ -131,24 +131,25 @@ class TestLattice(TestCaseWithAtoms):
         lay = sc.lattice()
         lay.set_vectors([2, 0, 0], [2, 2, 0], [0, 0, 3])
         lay.add_atom("Na", (0.5, 0.5, 0.5), unit=sc.Unit.Crystal)
-        self.assertAtomsEqual(lay.atoms()[0], ("Na", (2, 1, 1.5)))
+        self.assertEqual(lay.atoms()[0], sc.Atom("Na", (2, 1, 1.5)))
 
         # Change lattice vectors after adding atoms
         lay.set_vectors([4, 0, 0], [4, 4, 0], [0, 0, 6],
                         atoms_behaviour=sc.Unit.Crystal)
-        self.assertAtomsEqual(lay.atoms()[0], ("Na", (4, 2, 3)))
+        self.assertEqual(lay.atoms()[0], sc.Atom("Na", (4, 2, 3)))
 
         lay.set_vectors([8, 0, 0], [8, 8, 0], [0, 0, 12],
                         atoms_behaviour=sc.Unit.Angstrom)
-        self.assertAtomsEqual(lay.atoms()[0], ("Na", (4, 2, 3)))
+        self.assertEqual(lay.atoms()[0], sc.Atom("Na", (4, 2, 3)))
 
         # List atoms using CRYSTAL units
         lay = sc.lattice()
         lay.set_vectors([2, 0, 0], [2, 2, 0], [0, 0, 3])
         lay.add_atom("Na", (0.5, 0.5, 0.5), unit=sc.Unit.Crystal)
-        self.assertAtomsEqual(lay.atoms()[0], ("Na", (2, 1, 1.5)))
-        self.assertAtomsEqual(lay.atoms(unit=sc.Unit.Crystal)[0],
-                              ("Na", (0.5, 0.5, 0.5)))
+        self.assertEqual(lay.atoms()[0], sc.Atom("Na", (2, 1, 1.5)))
+        self.assertEqual(lay.atoms(unit=sc.Unit.Crystal)[0],
+                         sc.Atom("Na", (0.5, 0.5, 0.5),
+                                 pos_unit=sc.Unit.Crystal))
 
     def test_add_atoms_bad(self) -> None:
         """
@@ -187,16 +188,16 @@ class TestLattice(TestCaseWithAtoms):
         lay = sc.lattice()
         lay.set_vectors([1, 2, 3], [0.5, 0.7, 0.91], [3, 1, 0])
         lay.add_atoms([
-            ("Fe", (0, 2)),
-            ("Zn", (1, 0.5, 3), (0, 1, -1)),
-            ("Zn", (0.1, 0.2, 0.7)),
-            ("Zn", (0, 0, 0))
+            sc.Atom("Fe", (0, 2)),
+            sc.Atom("Zn", (1, 0.5, 3), spin=(0, 1, -1)),
+            sc.Atom("Zn", (0.1, 0.2, 0.7)),
+            sc.Atom("Zn", (0, 0, 0))
         ])
         lay.add_atoms([
-            ("Zn", (0.1, 0, 0), (0, 0, 1)),
-            ("Zn", (0.2, 0, 0), (0, 0, -1)),
-            ("Zn", (0.3, 0, 0), (0, 0, 1))
-        ], unit=sc.Unit.Crystal)
+            sc.Atom("Zn", (0.1, 0, 0), pos_unit=sc.Unit.Crystal, spin=(0, 0, 1)),
+            sc.Atom("Zn", (0.2, 0, 0), pos_unit=sc.Unit.Crystal, spin=(0, 0, -1)),
+            sc.Atom("Zn", (0.3, 0, 0), pos_unit=sc.Unit.Crystal, spin=(0, 0, 1))
+        ])
 
         # first goes Fe (-21.84...)
         # then Zn, starting with z-spin=1 and in order of adding,
@@ -241,10 +242,10 @@ Direct
         lay = sc.lattice()
         lay.set_vectors([1, 2, 3], [0.5, 0.7, 0.91], [3, 1, 0])
         lay.add_atoms([
-            ("Fe", (0, 2)),
-            ("Zn", (1, 0.5, 3), (0, 1, -1)),
-            ("Zn", (0.1, 0.2, 0.7)),
-            ("Zn", (0, 0, 0))
+            sc.Atom("Fe", (0, 2)),
+            sc.Atom("Zn", (1, 0.5, 3), spin=(0, 1, -1)),
+            sc.Atom("Zn", (0.1, 0.2, 0.7)),
+            sc.Atom("Zn", (0, 0, 0))
         ])
 
         expected_xsf = """CRYSTAL
