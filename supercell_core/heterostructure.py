@@ -477,11 +477,13 @@ class Heterostructure:
         # the supercell will be kept
         # Those integer linear combinations are called here 'nodes'
         get_node = lambda j, k: j * vecs[0] + k * vecs[1]
+        # 10 is arbtrary; hopefully it's enough
+        epsilon = 10 * np.finfo(np.dtype('float64')).eps
         nodes = [get_node(j, k)
-                 for j in range(-cell_upper_bound, cell_upper_bound)
-                 for k in range(-cell_upper_bound, cell_upper_bound)
-                 if 0 <= get_node(j, k)[0] < 1
-                 and 0 <= get_node(j, k)[1] < 1]
+                 for j in range(-cell_upper_bound, cell_upper_bound + 1)
+                 for k in range(-cell_upper_bound, cell_upper_bound + 1)
+                 if 0 <= get_node(j + 0.1, k + 0.1)[0] < 1 - epsilon
+                 and 0 <= get_node(j + 0.1, k + 0.1)[1] < 1 - epsilon]
 
         for pos, a in zip(atomic_pos_Dt_basis, atoms):
             for node in nodes:
