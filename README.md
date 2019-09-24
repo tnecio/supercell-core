@@ -47,7 +47,7 @@ print(res.strain_tensors()) # Use help(res) to see all public methods of `Result
 # Optimise strain to find best supercell, with max repetition along any
 # axis <= 12 substrate unit cells, and relative angle only from 0 to 7 degrees
 # with resolution 0.1 deg
-res = h.opt(max_el=12, thetas=[(0, 7*sc.DEGREE, 0.1*sc.DEGREE)])
+res = h.opt(max_el=12, thetas=[np.arange(0, 7*sc.DEGREE, 0.1*sc.DEGREE)])
 superlattice = res.superlattice() # Lattice object
 superlattice.save_POSCAR("POSCAR_sc") # save to file
 

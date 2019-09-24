@@ -1,7 +1,6 @@
 from typing import Optional, List
 import itertools
 
-from .atom import Atom
 from .lattice import Lattice
 from .physics import *
 from .result import *
@@ -528,7 +527,7 @@ class Heterostructure:
 
     def opt(self,
             max_el: int = 6,
-            thetas=None
+            thetas : Optional[List[Optional[List[float]]]] = None
             ) -> Result:
         """
         Minimises strain, and calculates its value.
@@ -542,13 +541,12 @@ class Heterostructure:
             The opt calculation is O(`max_el`^2).
             Default: 6
 
-        thetas : List[None or float or (float, float, float)], optional
-            Allows to override theta ranges specified for the layers.
+        thetas : List[List[float]|None], optional
+            Allows to override thetas specified for the layers.
             If specified, it must be equal in length to the number of layers.
-            When for a given layer one number is given then that layer's theta
-            angle is set to this number. If three-tuple is given it is treated
-            as a range in format (start, stop, step). If None is given, that
-            layers' default theta range is not overriden.
+            For a given layer, the list represents values of theta to check.
+            If None is is passed instead of one of the inner lists, then default
+            is not overriden.
             All angles are in radians.
 
         Returns
@@ -559,32 +557,21 @@ class Heterostructure:
         """
         # Prepare ranges of theta values
         if thetas is not None:
-            thetas = [arg if arg is not None else lay_desc[1]
+            thetas_in = [arg if arg is not None else np.arange(*lay_desc[1])
                       for arg, lay_desc in zip(thetas, self.__layers)]
-            theta_ranges = []
-            for theta in thetas:
-                try:
-                    # assume theta is a triple of numbers
-                    if len(theta) == 3:
-                        theta_ranges.append(theta)
-                    else:
-                        raise AttributeError
-                except TypeError:
-                    # no len on theta => theta should be a number
-                    theta_ranges.append((theta, theta + 0.01, 1.0))
         else:
-            theta_ranges = [lay_desc[1] for lay_desc in self.__layers]
+            thetas_in = [np.arange(*lay_desc[1]) for lay_desc in self.__layers]
 
         # Using (1, 1) norm since we are usually interested in minimising
         # |strain_ij| over i, j (where 'strain' is strain tensor)
-        thetas, ADt = self.__opt_aux((1, 1), max_el, theta_ranges)
+        thetas, ADt = self.__opt_aux((1, 1), max_el, thetas_in)
 
         return self.calc(ADt, thetas)
 
     def __opt_aux(self,
                   ord: Tuple[int, int],
                   max_el: int,
-                  theta_ranges: List[AngleRange]) \
+                  thetas_in: List[List[Angle]]) \
             -> Tuple[List[Angle], Matrix2x2]:
         """
         This routine calculates optimal supercell lattice vectors, layers'
@@ -598,10 +585,10 @@ class Heterostructure:
             (p, q) for calculating L_{p, q} norm of the strain tensor
         max_el : int
             Maximum absolute value of ADt matrix element
-        theta_ranges : List[(float, float, float)]
+        thetas_in : List[List[float]]
             Must have length equal to the number of layers in the heterostructure.
-            Tuple elements are (start, stop, step). They are used as the range
-            of angles to check for the corresponding layers.
+            Elements are lists or arrays containing possible values of thata for
+            a given layer.
 
         Returns
         -------
@@ -622,10 +609,8 @@ class Heterostructure:
         res: Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]] = \
             (None, np.inf, None, None)
 
-        thetas_lay = [np.arange(*tr) for tr in theta_ranges]
-
         # embarrasingly parallel, but Python GIL makes this irrelevant
-        for theta_lay in itertools.product(*thetas_lay):
+        for theta_lay in itertools.product(*thetas_in):
             strain_tensor_lay = [Heterostructure.__get_strain_tensor_opt(
                 theta, XA, XB, dt_As
             ) for theta, XB in zip(theta_lay, XB_lay)]
