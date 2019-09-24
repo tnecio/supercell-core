@@ -52,8 +52,7 @@ superlattice = res.superlattice() # Lattice object
 superlattice.save_POSCAR("POSCAR_sc") # save to file
 
 fig, ax = superlattice.draw()
-fig.show() # Show unit cell using matplotlib
-
+fig.show() # Show unit cell using matplotlib library
 
 # To learn more use built-in documentation, e.g.:
 help(nips3) # shows help on Lattice object when Python is in interactive mode (use 'q' to quit)

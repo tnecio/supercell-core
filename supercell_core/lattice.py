@@ -241,8 +241,6 @@ class Lattice:
         ----------
         atoms : List[Atom]
             List of atoms to add to the lattice unit cell
-        unit : Unit
-            Unit in which atomic positions of the `atoms` are specified
 
         Returns
         -------
@@ -367,6 +365,7 @@ class Lattice:
     def save_xsf(self, filename: Optional[str] = None) -> "Lattice":
         """
         Saves lattice structure in XCrysDen XSF file
+
         Parameters
         ----------
         filename : str, optional
@@ -412,9 +411,63 @@ class Lattice:
     def __z_spin(atom: Atom) -> Number:
         return atom.spin[2]
 
-    def draw(self):
-        pass
-        # TODO
+    def draw(self, ax=None):
+        """
+        Requires matplotlib. Creates an image of the lattice elementary cell
+        as a matplotlib plot.
+
+        Parameters
+        ----------
+        ax : matplotlib axes.Axes object, optional
+            If given, will draw the elementary cell to ax
+
+        Returns
+        -------
+        Figure, Axes
+
+        Notes
+        -----
+        Resulting axes has points labeled; use
+        `ax.legend(loc='best')` to turn on the legend.
+        """
+        if ax is None:
+            import matplotlib.pyplot as plt
+            plt.clf()
+            fig, ax = plt.subplots()
+        else:
+            fig = ax.figure
+
+        species = set()
+        for a in self.atoms():
+            species.add(a.element)
+
+        # A set of nice colours from ColorBrewer2.org
+        colors = [
+            (228 / 255, 26 / 255, 28 / 255),
+            (55 / 255, 126 / 255, 184 / 255),
+            (77 / 255, 175 / 255, 74 / 255),
+            (152 / 255, 78 / 255, 163 / 255),
+            (255 / 255, 127 / 255, 0 / 255),
+            (255 / 255, 255 / 255, 51 / 255),
+            (166 / 255, 86 / 255, 40 / 255),
+            (247 / 255, 129 / 255, 191 / 255),
+            (153 / 255, 153 / 255, 153 / 255)
+        ]
+
+        for color, specie in zip(colors, species):
+            atoms = [a for a in self.atoms() if a.element == specie]
+            ax.scatter([a.pos[0] for a in atoms],
+                       [a.pos[1] for a in atoms],
+                       marker='.',
+                       label=specie,
+                       color=color)
+            for a in atoms:
+                if a.spin[2] > 0:
+                    ax.annotate('↑', (a.pos[0], a.pos[1]))
+                elif a.spin[2] < 0:
+                    ax.annotate('↓', (a.pos[0], a.pos[1]))
+        ax.set_aspect('equal', adjustable='box')
+        return fig, ax
 
 
 def lattice():

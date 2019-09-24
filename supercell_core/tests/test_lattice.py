@@ -275,3 +275,24 @@ PRIMCOORD
         with patch('sys.stdout', new=StringIO()) as fakeOutput:
             lay.save_xsf()
             self.assertEqual(fakeOutput.getvalue(), expected_xsf)
+
+    def test_draw(self):
+        graphene = sc.read_POSCAR(
+            os.path.join(os.path.dirname(__file__),
+                         "../resources/vasp/graphene/POSCAR"), ["C"])
+        nips3 = sc.read_POSCAR(
+            os.path.join(os.path.dirname(__file__),
+                         "../resources/vasp/NiPS3/POSCAR"), ["Ni", "P", "S"],
+            magmom=""
+        )
+
+        fig, ax = graphene.draw()
+        fig.show()
+
+        fig, ax = nips3.draw()
+        fig.show()
+
+        # Two at the same time
+        fig, ax = graphene.draw()
+        fig, ax = nips3.draw(ax)
+        fig.show()
