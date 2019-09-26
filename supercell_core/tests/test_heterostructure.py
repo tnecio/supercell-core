@@ -105,4 +105,3 @@ class TestHeterostructure(ut.TestCase):
         # `calc` is called by `opt` so for now we can do without a separate test
         pass
 
-    # TODO: documentation: use-case: plot min strain (theta) in matplotlib

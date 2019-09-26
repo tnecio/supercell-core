@@ -6,10 +6,7 @@ Author: Tomasz Necio, University of Warsaw
 Copyright (C) 2019 University of Warsaw
 
 # Installation:
-1. Ensure you have Python3, numpy, matplotlib installed
-2. git clone the repository to where ever you want
-3. Add the directory with supercell-core to your python path (if you use Bash/Linux: add
-`export PYTHONPATH="${PYTHONPATH}:/path/to/supercell/core` to file `~/.bashrc`)
+`pip3 install supercell-core --user`
 
 # Usage example
 

@@ -179,8 +179,8 @@ class Lattice:
         spin : 3D vector, optional
             Describes spin of the atom (s_x, s_y, s_z), default: (0, 0, 0)
         unit : Unit
-            Gives unit in which `pos` was given (must be either Unit.ANGSTROM
-            or Unit.CRYSTAL)
+            Gives unit in which `pos` was given (must be either `Unit.Angstrom`
+            or `Unit.Crystal`)
         normalise_positions : bool
             If True, atomic positions are moved to be within the elementary cell
             (preserving location of atoms in the whole crystal)

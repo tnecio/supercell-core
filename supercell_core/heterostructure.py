@@ -23,7 +23,7 @@ class Heterostructure:
     lattice. `Heterostructure` describes a collection of crystals that build
     up the structure; to obtain the crystal lattice resulting from joining
     these crystals you must first define a way in which these crystals come
-    together (angles, etc. – use `opt`, `res`, or `plot` methods to do this),
+    together (angles, etc. – use `opt` or `res` methods to do this),
     and the resulting lattice will be available as `supercell` attribute
     of the `Result` class (see documentation of the relevant methods)
     """
@@ -224,8 +224,7 @@ class Heterostructure:
         Lattice
             Lattice object describing the layer
         (float, float, float)
-            (start, stop, step) (radians) – angles used in `calc`, `opt`, and
-            `plot` calculations
+            (start, stop, step) (radians) – angles used in `calc` and `opt`
             If a specific angle is set, returned tuple is (angle, angle, 1.0)
 
         Raises
