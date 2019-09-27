@@ -8,6 +8,10 @@ Copyright (C) 2019 University of Warsaw
 # Installation:
 `pip3 install supercell-core --user`
 
+# Documentation
+
+https://supercell-core.readthedocs.io/en/latest/
+
 # Usage example
 
 ```

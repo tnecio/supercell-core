@@ -10,6 +10,8 @@ Welcome to supercell_core's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   modules
+   
    readme
 
 

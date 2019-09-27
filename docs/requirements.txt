@@ -1,2 +1,3 @@
-m2r
+sphinx>=2.2.0
 sphinx_rtd_theme
+m2r
