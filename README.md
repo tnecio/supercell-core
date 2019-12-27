@@ -10,7 +10,7 @@ Copyright (C) 2019 University of Warsaw
 
 # Documentation
 
-https://supercell-core.readthedocs.io/en/latest/
+https://readthedocs.org/projects/supercell-core/
 
 # Usage example
 
