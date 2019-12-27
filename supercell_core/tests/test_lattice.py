@@ -276,10 +276,27 @@ PRIMCOORD
             lay.save_xsf()
             self.assertEqual(fakeOutput.getvalue(), expected_xsf)
 
-    def test_draw(self):
-        graphene = sc.read_POSCAR(
+    def load_graphene(self):
+        return sc.read_POSCAR(
             os.path.join(os.path.dirname(__file__),
                          "../resources/vasp/graphene/POSCAR"), ["C"])
+
+    def test_translate(self):
+        l = sc.lattice().set_vectors([2, 0], [0, 2])
+        l.add_atom("H", (0.0, 1.0))
+        l.add_atom("He", (1.0, 3.0))
+
+        l.translate_atoms((-1, -2))
+        self.assertEqual(l.atoms()[0], sc.Atom("H", (-1, -1)))
+        self.assertEqual(l.atoms()[1], sc.Atom("He", (0, 1)))
+
+        l.translate_atoms((0.5, 0.5), unit=sc.Unit.Crystal)
+        self.assertEqual(l.atoms()[0], sc.Atom("H", (0, 0)))
+        self.assertEqual(l.atoms()[1], sc.Atom("He", (1, 2)))
+
+    def test_draw(self):
+        graphene = self.load_graphene()
+
         nips3 = sc.read_POSCAR(
             os.path.join(os.path.dirname(__file__),
                          "../resources/vasp/NiPS3/POSCAR"), ["Ni", "P", "S"],
@@ -296,3 +313,4 @@ PRIMCOORD
         fig, ax = graphene.draw()
         fig, ax = nips3.draw(ax)
         fig.show()
+

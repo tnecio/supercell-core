@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 from .errors import *
 from .calc import *
@@ -162,7 +162,6 @@ class Lattice:
                  pos: VectorLike,
                  spin: VectorLike = (0, 0, 0),
                  unit: Unit = Unit.Angstrom,
-                 velocity: VectorLike = (0, 0, 0),
                  normalise_positions: bool = False) -> "Lattice":
         """
         Adds a single atom to the unit cell of the lattice
@@ -411,6 +410,30 @@ class Lattice:
     def __z_spin(atom: Atom) -> Number:
         return atom.spin[2]
 
+    def translate_atoms(self, vec: VectorLike, unit: Unit = Unit.Angstrom):
+        """
+        Moves all atoms in the unit cell by some vector `vec`
+
+        Parameters
+        ----------
+        vec : VectorLike
+            Translation vector. If len(vec) == 2, third argument is set to zero.
+        unit : Unit, optional
+            Unit of `vec`, by default: angstroms
+
+        Returns
+        -------
+        None
+        """
+        if len(vec) == 2:
+            vec = (vec[0], vec[1], 0)
+
+        atoms = self.atoms(unit=unit)
+        for a in atoms:
+            a.pos = tuple(np.array(a.pos) + np.array(vec))
+        self.__atoms = []
+        self.add_atoms(atoms)
+
     def draw(self, ax=None):
         """
         Requires matplotlib. Creates an image of the lattice elementary cell
@@ -466,6 +489,12 @@ class Lattice:
                     ax.annotate('↑', (a.pos[0], a.pos[1]))
                 elif a.spin[2] < 0:
                     ax.annotate('↓', (a.pos[0], a.pos[1]))
+
+        # Draw cell boundary
+        vecs = np.array([v[0:2] for v in self.vectors()[0:2]])
+        pts = np.array([(0, 0), vecs[0], vecs[0] + vecs[1], vecs[1], (0, 0)]).T
+        ax.plot(pts[0], pts[1], '--', color="gray")
+
         ax.set_aspect('equal', adjustable='box')
         return fig, ax
 
