@@ -101,6 +101,23 @@ class TestHeterostructure(ut.TestCase):
         self.assertAlmostEqual(res.max_strain(), 0.000608879275296, places=5)
         self.assertEqual(res.atom_count(), 552)
 
+    def test_opt2(self):
+        # Defining unit cell of graphene
+        graphene = sc.lattice()
+        graphene.set_vectors([2.13, -1.23], [2.13, 1.23])
+        # "C" (carbon) atoms in the unit cell in either
+        # angstrom or direct coordinates
+        graphene.add_atom("C", (0, 0, 0)) \
+            .add_atom("C", (2 / 3, 2 / 3, 0),
+                      unit=sc.Unit.Crystal)
+
+        # Combining graphene layers
+        h = sc.heterostructure().set_substrate(graphene) \
+            .add_layer(graphene)
+        for theta in np.arange(0, 1 * sc.DEGREE, 0.25 * sc.DEGREE):
+            h.opt(max_el=8, thetas=[theta])
+
+
     def test_calc(self):
         # `calc` is called by `opt` so for now we can do without a separate test
         pass

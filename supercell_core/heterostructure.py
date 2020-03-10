@@ -526,7 +526,7 @@ class Heterostructure:
 
     def opt(self,
             max_el: int = 6,
-            thetas : Optional[List[Optional[List[float]]]] = None
+            thetas: Optional[List[Optional[List[float]]]] = None
             ) -> Result:
         """
         Minimises strain, and calculates its value.
@@ -540,12 +540,14 @@ class Heterostructure:
             The opt calculation is O(`max_el`^2).
             Default: 6
 
-        thetas : List[List[float]|None], optional
+        thetas : List[List[float]|None] | List[float], optional
             Allows to override thetas specified for the layers.
             If specified, it must be equal in length to the number of layers.
             For a given layer, the list represents values of theta to check.
             If None is is passed instead of one of the inner lists, then default
             is not overriden.
+            If there are only two layers, the argument can be passed just as a list
+            of floats, without the need for nesting.
             All angles are in radians.
 
         Returns
@@ -556,8 +558,13 @@ class Heterostructure:
         """
         # Prepare ranges of theta values
         if thetas is not None:
-            thetas_in = [arg if arg is not None else np.arange(*lay_desc[1])
-                      for arg, lay_desc in zip(thetas, self.__layers)]
+            if isinstance(thetas[0], list):
+                thetas_in = [arg if arg is not None else np.arange(*lay_desc[1])
+                            for arg, lay_desc in zip(thetas, self.__layers)]
+            elif len(self.__layers) == 1:
+                thetas_in = [thetas]
+            else:
+                raise TypeError("Bad argument thetas")
         else:
             thetas_in = [np.arange(*lay_desc[1]) for lay_desc in self.__layers]
 
