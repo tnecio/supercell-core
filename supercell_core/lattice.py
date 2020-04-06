@@ -271,7 +271,9 @@ class Lattice:
             return [atom.basis_change(self.__XA, Unit.Angstrom)
                     for atom in self.__atoms]
 
-    def save_POSCAR(self, filename: Optional[str] = None) -> "Lattice":
+    def save_POSCAR(self,
+                    filename: Optional[str] = None,
+                    silent: bool = False) -> "Lattice":
         """
         Saves lattice structure in VASP POSCAR file.
         Order of the atomic species is the same as order of their first
@@ -284,6 +286,8 @@ class Lattice:
         ----------
         filename : str, optional
             if not provided, writes to stdout
+        silent : bool, default: False
+            if True, the atomic order and MAGMOM flag are not printed to stdout
 
         Returns
         -------
@@ -351,13 +355,14 @@ class Lattice:
         else:
             print(s)
 
-        print("Note: The order of the atomic species in this generated " +
-              "POSCAR file is as follows:\n" + " ".join(names))
+        if not silent:
+            print("Note: The order of the atomic species in this generated " +
+                  "POSCAR file is as follows:\n" + " ".join(names))
 
-        # magmom
-        magmom_str = " ".join([((str(x[1]) + "*" if x[1] > 1 else "") + str(x[0]))
-                               for x in magmom])
-        print("MAGMOM flag: " + magmom_str)
+            # magmom
+            magmom_str = " ".join([((str(x[1]) + "*" if x[1] > 1 else "")
+                                   + str(x[0])) for x in magmom])
+            print("MAGMOM flag: " + magmom_str)
 
         return self
 
