@@ -323,6 +323,17 @@ class Heterostructure:
         ADt = np.array(M)
         return self.__calc_aux(ADt, thetas)
 
+    def __calc_strain_tensor_from_ADt(self, ADt: Matrix2x2, XBr: Matrix2x2) -> Matrix2x2:
+        BrDt, BtrBr, XXt = self.__get_basis_change_matrices(ADt, XBr)
+        return Heterostructure.__calc_strain_tensor(XBr, XXt)
+
+    def __get_basis_change_matrices(self, ADt, XBr):
+        XA = self.__substrate.basis_change_matrix()[0:2, 0:2]
+        BrDt = inv(XBr) @ XA @ ADt
+        BtrBr = Heterostructure.__get_BtrBr(BrDt)
+        XXt = XBr @ inv(BtrBr) @ inv(XBr)
+        return BrDt, BtrBr, XXt
+
     def __calc_aux(self,
                    ADt: InMatrix2x2,
                    thetas: List[Angle]) -> Result:
@@ -343,15 +354,20 @@ class Heterostructure:
         Result
             see `Result` documentation for details
         """
-
         XA = self.__substrate.basis_change_matrix()[0:2, 0:2]
         XBrs = [rotate(lay_desc[0].basis_change_matrix()[0:2, 0:2], theta)
                 for theta, lay_desc in zip(thetas, self.__layers)]
-        BrDts = [inv(XBr) @ XA @ ADt for XBr in XBrs]
-        BtrBrs = [Heterostructure.__get_BtrBr(BrDt) for BrDt in BrDts]
-        XXts = [XBr @ inv(BtrBr) @ inv(XBr) for XBr, BtrBr in zip(XBrs, BtrBrs)]
-        strain_tensors = [Heterostructure.__calc_strain_tensor(XBr, XXt)
-                          for XBr, XXt in zip(XBrs, XXts)]
+        strain_tensors = [self.__calc_strain_tensor_from_ADt(ADt, XBr)
+                          for XBr in XBrs]
+        BrDts = []
+        BtrBrs = []
+        XXts = []
+        for XBr in XBrs:
+            BrDt, BtrBr, XXt = self.__get_basis_change_matrices(ADt, XBr)
+            BrDts.append(BrDt)
+            BtrBrs.append(BtrBr)
+            XXts.append(XXt)
+
         ABtrs = [inv(XA) @ XBr @ inv(BtrBr) for XBr, BtrBr in zip(XBrs, BtrBrs)]
 
         # also add the alternative strain tensor definition to the Result
@@ -556,11 +572,19 @@ class Heterostructure:
             Result object containing the results of the optimisation.
             For more information see documentation of `Result`
         """
+
         # Prepare ranges of theta values
+        def is_iterable(x):
+            try:
+                iter(x)
+                return True
+            except Exception:
+                return False
+
         if thetas is not None:
-            if isinstance(thetas[0], list):
+            if is_iterable(thetas[0]):
                 thetas_in = [arg if arg is not None else np.arange(*lay_desc[1])
-                            for arg, lay_desc in zip(thetas, self.__layers)]
+                             for arg, lay_desc in zip(thetas, self.__layers)]
             elif len(self.__layers) == 1:
                 thetas_in = [thetas]
             else:
@@ -607,77 +631,76 @@ class Heterostructure:
 
         # prepare layer matrices
         XA, XB_lay = self.__get_lattice_matrices()
+        dt_As = self._get_dt_As(max_el)
 
-        dt_As = self.__get_dt_As(max_el)
+        memo = {}
+
+        for thetas, (i, XB) in zip(thetas_in, enumerate(XB_lay)):
+            for theta in thetas:
+                AB = inv(XA) @ XB
+                A_inv = self._prepare_A_inv(theta, XA, AB)
+                qtys = self._moire(dt_As, A_inv)
+                memo[float(theta), i] = qtys
 
         # Dummy start value for classic O(n) find min algorithm, we want to find
         # values for which sum of `quality_fun`(strain tensor) is minimal
         res: Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]] = \
             (None, np.inf, None, None)
 
-        # embarrasingly parallel, but Python GIL makes this irrelevant
-        for theta_lay in itertools.product(*thetas_in):
-            strain_tensor_lay = [Heterostructure.__get_strain_tensor_opt(
-                theta, XA, XB, dt_As
-            ) for theta, XB in zip(theta_lay, XB_lay)]
+        for theta_comb in itertools.product(*thetas_in):
+            qtyss = [memo[float(theta), i] for i, theta in enumerate(theta_comb)]
+            qtys_total = sum(qtyss)
 
-            # qty – array which contains norms of the strain tensors
-            qty = sum([matnorm(st, ord[0], ord[1]) for st in strain_tensor_lay])
+            ADt = np.zeros((2, 2))
+            while all(ADt[:, 0] == 0) or all(ADt[:, 1] == 0):
+                argmax_indices = np.unravel_index(qtys_total.argmax(), qtys_total.shape)
+                qtys_total[argmax_indices] = -np.inf # removes this vector from "search pool"
+                vec = dt_As[argmax_indices]
 
-            # if qty is NaN it means that we somehow ended up with linear
-            # dependence; in the limit strain would go to infinity
-            qty[np.isnan(qty)] = np.inf
+                if all(ADt[:, 0] == 0):
+                    ADt[:, 0] = vec
+                else:
+                    if np.isclose(ADt[0, 0] * vec[1], ADt[1, 0] * vec[0]): # det != 0
+                        continue
+                    ADt[:, 1] = vec
+                    XBrs = [rotate(XB, theta) for XB, theta in zip(XB_lay, theta_comb)]
+                    BrDts = [inv(XBr) @ XA @ ADt for XBr in XBrs]
+                    BtrDts = [np.round(BrDt) for BrDt in BrDts]
+                    zero_dets = [x[0][0] * x[1][1] == x[0][1] * x[1][0] for x in BtrDts]
+                    if any(zero_dets):
+                        ADt[:, 1] = 0
+                        continue
+                    ADt[:, 1] = vec
 
-            argmin_indices = np.unravel_index(qty.argmin(), qty.shape)
-            min_qty = qty[argmin_indices]
-            min_st_lay = [st[argmin_indices] for st in strain_tensor_lay]
-            ADt = np.stack((dt_As[argmin_indices[0], argmin_indices[2]],
-                            dt_As[argmin_indices[1], argmin_indices[3]]))
-            XDt = XA @ ADt
-
-            # let's check if the best values for this combination of theta vals
-            # (theta_lay) are better than those we already have
-            res = Heterostructure.__update_opt_res(res, theta_lay, min_qty, XDt, min_st_lay)
+            XBrs = [rotate(XB, theta) for (XB, theta) in zip(XB_lay, theta_comb)]
+            sts = [self.__calc_strain_tensor_from_ADt(ADt, XBr) for XBr in XBrs]
+            qty = sum([matnorm(st, *ord) for st in sts])
+            res = Heterostructure.__update_opt_res(res, theta_comb, qty, XA @ ADt, sts)
 
         ADt = inv(XA) @ res[2]
         thetas = res[0]
         return thetas, ADt
 
-    @staticmethod
-    def __get_strain_tensor_opt(theta: float,
-                                XA: Matrix2x2,
-                                XB: Matrix2x2,
-                                dt_As: np.ndarray) -> np.ndarray:
-        """
-        Calculates strain tensor for `opt_aux`.
-        Just lots of linear algebra, really.
+    def _prepare_A_inv(self, theta, XA, AB):
+        # inv is OK, since this will always be a 2x2 matrix
+        b1x, b1y, b2x, b2y = AB[0][0], AB[1][0], AB[0][1], AB[1][1]
+        costh, sinth = np.cos(theta), np.sin(theta)
+        rot_A = inv(XA) @ np.array([
+            [costh, -sinth],
+            [sinth, costh]
+        ]) @ XA
+        # TODO: better way to make this array?
+        return inv(np.array([
+            [rot_A[0, 0] * b1x + rot_A[0, 1] * b1y, rot_A[0, 0] * b2x + rot_A[0, 1] * b2y],
+            [rot_A[1, 0] * b1x + rot_A[1, 1] * b1y, rot_A[1, 0] * b2x + rot_A[1, 1] * b2y]
+        ]))
 
-        Parameters
-        ----------
-        theta : float
-        XA : Matrix 2x2
-        XB : Matrix 2x2
-        dt_As : np.ndarray, shape (span, span, 2)
+    def _moire(self, dt_As, A_inv):
+        solution_vecs = matvecmul(A_inv, dt_As)
+        qtys = -vecnorm(solution_vecs - np.round(solution_vecs), 2)
+        return qtys
 
-        Returns
-        -------
-        np.ndarray with shape (span, span, span, span, 2, 2)
-
-        Notes
-        -----
-        Definiton of strain tensor here is the same as in documentation
-        for `calc`
-        """
-
-        dt_xs = matvecmul(XA, dt_As)
-        AX = inv(XA)
-        d_xs = Heterostructure.__get_d_xs(AX, XB, dt_As, theta)
-        XXt = Heterostructure.__get_XXt(d_xs, dt_xs)
-        XBr = rotate(XB, theta)
-        return Heterostructure.__calc_strain_tensor(XBr, XXt)
-
-    @staticmethod
-    def __get_dt_As(max_el: int) -> np.ndarray:
+    def _get_dt_As(self, max_el: int) -> np.ndarray:
         """
         Prepares dt_As for __opt_aux calculation.
 
@@ -698,6 +721,7 @@ class Heterostructure:
         span_range[(max_el + 1):] -= 2 * max_el + 1
         dt_As = np.transpose(np.meshgrid(span_range, span_range))
 
+        dt_As[0, 0] = [0, 1] # Hack to remove "[0, 0]" vector
         return dt_As
 
     @staticmethod
@@ -774,75 +798,6 @@ class Heterostructure:
                for lay_desc in self.__layers]
         return XA, XBs
 
-    @staticmethod
-    def __get_d_xs(
-            AX: np.ndarray,
-            XB: np.ndarray,
-            dt_As: np.ndarray,
-            theta: Angle) -> np.ndarray:
-        """
-        Returns an array of `d` vectors in Cartesian basis
-
-        Parameters
-        ----------
-        AX : Matrix2x2
-        XB : Matrix 2x2
-        dt_As : np.ndarray, shape (..., 2)
-        theta : float
-
-        Returns
-        -------
-        np.ndarray, shape (..., 2)
-        """
-        XBr = rotate(XB, theta)
-        BrA = inv(AX @ XBr)
-
-        dt_Brs = matvecmul(BrA, dt_As)
-
-        # Here we use the fact that the supercell must "stretch" lattice vectors
-        # of constituent layers so that they superlattice vectors are linear
-        # _integer_ combinations of any one layers' lattice vectors.
-        dt_Btrs = np.round(dt_Brs)
-
-        d_Brs = dt_Btrs
-        return matvecmul(XBr, d_Brs)
-
-    @staticmethod
-    def __get_XXt(d_xs: np.ndarray, dt_xs: np.ndarray) -> np.ndarray:
-        """
-        Calculates basis change matrices Xt -> X
-
-        Parameters
-        ----------
-        dt_xs : np.ndarray with shape (span, span, 2)
-            array of dt(x, y) vectors in X basis
-        d_xs : np.ndarray with shape (span, span, 2)
-            array of d(x, y) vectors in X basis
-
-        Returns
-        -------
-        np.ndarray with shape (span, span, span, span, 2, 2)
-            array of XXt matrices, where element XXt[x1, y1, x2, y2]
-            corresponds to d(x1, y1) and d(x2, y2) vectors.
-            If vectors d(x1, y1) and d(x2, y2) make a singular matrix,
-            corresponding values are changed to np.inf
-        """
-        span = d_xs.shape[0]
-
-        XDt = np.empty((span, span, span, span, 2, 2))
-        XDt[..., 0] = dt_xs[np.newaxis, np.newaxis, ...]
-        XDt[..., 1] = dt_xs[..., np.newaxis, np.newaxis, :]
-
-        XD = np.empty((span, span, span, span, 2, 2))
-        XD[..., 0] = d_xs[np.newaxis, np.newaxis, ...]
-        XD[..., 1] = d_xs[..., np.newaxis, np.newaxis, :]
-
-        # what we want is basically XDt @ DX, which means we need to invert XD
-        # (XXt = XD DDt DX = XDt DX)
-
-        return XDt @ inv(XD)
-
-        # TODO: suppress divide-by-zero warning
 
 
 def heterostructure() -> Heterostructure:

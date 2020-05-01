@@ -77,7 +77,6 @@ class TestHeterostructure(ut.TestCase):
 
     def test_opt(self):
         # graphene-NiPS3 low-strain angle 21.9, theta range 16-30-0.1
-        # Note: Takes a while
         graphene = sc.read_POSCAR(
             path.join(path.dirname(__file__), "../resources/vasp/graphene/POSCAR"),
             ["C"])
@@ -86,39 +85,31 @@ class TestHeterostructure(ut.TestCase):
             ["Ni", "P", "S"]
         )
 
-        sub = graphene
-        lay = nips3
-
         h = sc.heterostructure()
-        h.set_substrate(sub)
-        h.add_layer(lay, theta=(16 * sc.DEGREE, 30 * sc.DEGREE, 0.1 * sc.DEGREE))
+        h.set_substrate(graphene)
+        h.add_layer(nips3)
 
-        res = h.opt(max_el=11)
+        res = h.opt(max_el=11, thetas=np.arange(16 * sc.DEGREE, 30 * sc.DEGREE, 0.1 * sc.DEGREE))
 
-        self.assertTrue(np.allclose(res.M(), np.array([[7, 9], [10, -8]])))
-        self.assertTrue(np.allclose(res.layer_Ms()[0], np.array([[6, -1], [-1, -2]])))
+        self.assertTrue(np.allclose(res.M(), np.array([[7, 9], [10, -8]]))
+                        or np.allclose(res.M(), np.array([[9, 7], [-8, 10]])))
+        self.assertTrue(np.allclose(res.layer_Ms()[0], np.array([[6, -1], [-1, -2]]))
+                        or np.allclose(res.layer_Ms()[0], np.array([[-1, 6], [-2, -1]])))
         self.assertAlmostEqual(res.thetas()[0], 21.9 * sc.DEGREE)
         self.assertAlmostEqual(res.max_strain(), 0.000608879275296, places=5)
         self.assertEqual(res.atom_count(), 552)
 
-    def test_opt2(self):
-        # Defining unit cell of graphene
-        graphene = sc.lattice()
-        graphene.set_vectors([2.13, -1.23], [2.13, 1.23])
-        # "C" (carbon) atoms in the unit cell in either
-        # angstrom or direct coordinates
-        graphene.add_atom("C", (0, 0, 0)) \
-            .add_atom("C", (2 / 3, 2 / 3, 0),
-                      unit=sc.Unit.Crystal)
+    def test_opt_graphene_moire(self):
+        graphene = sc.read_POSCAR(
+            path.join(path.dirname(__file__), "../resources/vasp/graphene/POSCAR"),
+            ["C"])
 
-        # Combining graphene layers
-        h = sc.heterostructure().set_substrate(graphene) \
-            .add_layer(graphene)
-        for theta in np.arange(0, 1 * sc.DEGREE, 0.25 * sc.DEGREE):
-            h.opt(max_el=8, thetas=[theta])
+        h = sc.heterostructure()
+        h.set_substrate(graphene)
+        h.add_layer(graphene)
 
+        res = h.opt(max_el=20, thetas=np.arange(5.5 * sc.DEGREE, 7 * sc.DEGREE, 0.001 * sc.DEGREE))
+        self.assertAlmostEqual(res.max_strain(), 0, places=6)
+        self.assertEqual(res.atom_count(), 364)
 
-    def test_calc(self):
-        # `calc` is called by `opt` so for now we can do without a separate test
-        pass
-
+    # `calc` is called by `opt` so for now we can do without a separate test

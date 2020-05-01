@@ -14,8 +14,8 @@ from ..heterostructure import *
 class TestHeterostructurePrivate(ut.TestCase):
     def test_opt_aux(self):
         # test 1: graphene-graphene magic angle 21.8, theta range 16-24-0.1
-        max_el = 4
-        theta_ranges = [(16 * DEGREE, 24 * DEGREE, 0.1 * DEGREE)]
+        max_el = 3#4
+        theta_ranges = [np.arange(16 * DEGREE, 24 * DEGREE, 0.1 * DEGREE)]
 
         graphene = sc.read_POSCAR(
             path.join(path.dirname(__file__), "../resources/vasp/graphene/POSCAR"),
@@ -27,7 +27,7 @@ class TestHeterostructurePrivate(ut.TestCase):
         actual_res = h._Heterostructure__opt_aux(
             (1, 1),
             max_el, theta_ranges
-        )
+        ) # (thetas, ADt)
 
         expected_res = ([21.8 * DEGREE],
                         np.array([[2, 3], [-3, -1]]))

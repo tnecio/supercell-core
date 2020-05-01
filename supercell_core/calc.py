@@ -6,7 +6,7 @@ especially with operations on arrays of matrices
 from typing import List
 import numpy as np
 
-ABS_EPSILON = 1e-7
+ABS_EPSILON = 1e-6
 
 
 def rotate(a: np.ndarray, theta: float) -> np.ndarray:
@@ -116,3 +116,19 @@ def matnorm(m: np.ndarray, p: float, q: float) -> np.ndarray:
     return ((np.abs(m[..., 0, 0]) ** p + np.abs(m[..., 0, 1]) ** p) ** (q / p)
             + (np.abs(m[..., 1, 0]) ** p + np.abs(m[..., 1, 1]) ** p) ** (q / p)) \
            ** (1 / q)
+
+def vecnorm(v: np.ndarray, q: float) -> np.ndarray:
+    """
+    Calculates norm of every 2D vector in `v`
+
+    Parameters
+    ----------
+    m : np.ndarray, shape (..., 2)
+    q : float >= 1
+
+    Returns
+    -------
+    np.ndarray
+    """
+    # NOTE: No ` ** (1 / q)` because we only use these values for comparison
+    return np.abs(v[..., 0]) ** q + np.abs(v[..., 1]) ** q
