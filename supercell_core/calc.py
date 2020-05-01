@@ -117,6 +117,7 @@ def matnorm(m: np.ndarray, p: float, q: float) -> np.ndarray:
             + (np.abs(m[..., 1, 0]) ** p + np.abs(m[..., 1, 1]) ** p) ** (q / p)) \
            ** (1 / q)
 
+
 def vecnorm(v: np.ndarray, q: float) -> np.ndarray:
     """
     Calculates norm of every 2D vector in `v`

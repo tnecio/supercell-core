@@ -32,7 +32,7 @@ class Heterostructure:
     #
     # MN – basis change matrix from N to M
     #      (the order of the letters makes it easy to combine these:
-    #       MM' @ M'N == MN)
+    #       MW @ WN == MN for any W)
     # v_M – vector v (unit vector of basis V) in basis M
     # v_Ms – an array of vectors v in basis M
     # stg_lay – list of "stg" for each of the layers
@@ -51,6 +51,8 @@ class Heterostructure:
     #          vectors
     # X, x – cartesian basis (unit vectors: (1 angstrom, 0),
     #                                    (0, 1 angstrom))
+    # Xt, xt – Transformation corresponding to Br - Btr transformation, but in
+    # cartesian basis
     #
     # Note that the vector space of all the mentioned objects is R^2
 
@@ -246,7 +248,7 @@ class Heterostructure:
         Parameters
         ----------
         XBr : Matrix 2x2
-        XBr : Matrix 2x2
+        XXt : Matrix 2x2
 
         Returns
         -------
@@ -324,10 +326,38 @@ class Heterostructure:
         return self.__calc_aux(ADt, thetas)
 
     def __calc_strain_tensor_from_ADt(self, ADt: Matrix2x2, XBr: Matrix2x2) -> Matrix2x2:
+        """
+        Calculate strain tensor.
+
+        See docs of `Heterostructure.calc` for definition of strain tensor.
+
+        Parameters
+        ----------
+        ADt : Matrix 2x2
+        XBr : Matrix 2x2
+
+        Returns
+        -------
+        Matrix 2x2
+        """
         BrDt, BtrBr, XXt = self.__get_basis_change_matrices(ADt, XBr)
         return Heterostructure.__calc_strain_tensor(XBr, XXt)
 
     def __get_basis_change_matrices(self, ADt, XBr):
+        """
+        Helper function to retrieve BrDt, BtrBr, XXt matrices
+
+        Parameters
+        ----------
+        ADt : Matrix 2x2
+        XBr : Matrix 2x2
+
+        Returns
+        -------
+        BrDt : Matrix 2x2
+        BtrDt : Matrix 2x2
+        XXt : Matrix 2x2
+        """
         XA = self.__substrate.basis_change_matrix()[0:2, 0:2]
         BrDt = inv(XBr) @ XA @ ADt
         BtrBr = Heterostructure.__get_BtrBr(BrDt)
@@ -534,6 +564,9 @@ class Heterostructure:
 
     @staticmethod
     def __get_BtrBr(BrDt):
+        """
+        BrDt -> BtrBr
+        """
         # see why round in implementation of `Heterostructue.__get_d_xs`
         BtrDt = np.round(BrDt)
         return BtrDt @ inv(BrDt)
@@ -572,6 +605,10 @@ class Heterostructure:
             Result object containing the results of the optimisation.
             For more information see documentation of `Result`
         """
+        # TODO: the whole routine is pretty complex;
+        #   maybe separate opt numerics into a class "MoireSolver" or stg.
+        #   so we don't have to deal with passing XA, XB etc. all the time,
+        #   and the mess in Heterostructure
 
         # Prepare ranges of theta values
         def is_iterable(x):
@@ -633,13 +670,15 @@ class Heterostructure:
         XA, XB_lay = self.__get_lattice_matrices()
         dt_As = self._get_dt_As(max_el)
 
+        # Precalculate qualities of solutions here, since this problem is independent for
+        # each layer; the final solution depends on a specific combination of thetas
+        # but to calculate how much stretched the Br basis will be for each possible dt
+        # vector will be we only need to know the Br (theta + XB)
+        # Complexity: O(thetas_len * no. layers * max_el ** 2)
         memo = {}
-
         for thetas, (i, XB) in zip(thetas_in, enumerate(XB_lay)):
             for theta in thetas:
-                AB = inv(XA) @ XB
-                A_inv = self._prepare_A_inv(theta, XA, AB)
-                qtys = self._moire(dt_As, A_inv)
+                qtys = self._moire(dt_As, XA, XB, theta)
                 memo[float(theta), i] = qtys
 
         # Dummy start value for classic O(n) find min algorithm, we want to find
@@ -647,56 +686,117 @@ class Heterostructure:
         res: Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]] = \
             (None, np.inf, None, None)
 
+        # We need to have this loop over all possible combinations since
+        # ADt is one for the whole structure and must minimise strains in
+        # all layers simulatneously
+        # Complexity: O(thetas_len ** no. layers * max_el ** 2)
+        # Could probably use a few tricks to get it down to stg like O(thetas_len ** no. layers)
+        # or at least O(thetas_len ** no. layers * max_el)
         for theta_comb in itertools.product(*thetas_in):
             qtyss = [memo[float(theta), i] for i, theta in enumerate(theta_comb)]
             qtys_total = sum(qtyss)
 
             ADt = np.zeros((2, 2))
+            # This loop is in practice O(1) since the number of vectors giving singular ADt
+            # is O(max_el) and then, if for one such vector the qty != 0 then it's very
+            # unprobable that the second one will happen to be parallel
             while all(ADt[:, 0] == 0) or all(ADt[:, 1] == 0):
                 argmax_indices = np.unravel_index(qtys_total.argmax(), qtys_total.shape)
-                qtys_total[argmax_indices] = -np.inf # removes this vector from "search pool"
+                qtys_total[argmax_indices] = -np.inf  # removes this vector from "search pool"
                 vec = dt_As[argmax_indices]
 
                 if all(ADt[:, 0] == 0):
                     ADt[:, 0] = vec
                 else:
-                    if np.isclose(ADt[0, 0] * vec[1], ADt[1, 0] * vec[0]): # det != 0
-                        continue
                     ADt[:, 1] = vec
-                    XBrs = [rotate(XB, theta) for XB, theta in zip(XB_lay, theta_comb)]
-                    BrDts = [inv(XBr) @ XA @ ADt for XBr in XBrs]
-                    BtrDts = [np.round(BrDt) for BrDt in BrDts]
-                    zero_dets = [x[0][0] * x[1][1] == x[0][1] * x[1][0] for x in BtrDts]
-                    if any(zero_dets):
+                    if not self.__is_ADt_acceptable(ADt, XA, XB_lay, theta_comb):
+                        # Back off from adding this vec
                         ADt[:, 1] = 0
-                        continue
-                    ADt[:, 1] = vec
+                    # Note: we always use the best candidate vec and only consider
+                    # the second one (ADt[:. 1]) suspicious because if it is in fact bad
+                    # the it must be almost-parallel or parallel to the first one, so
+                    # it doesn't matter much which one we pick to stay
 
+            # Check if result for this angle combination is better than for the previous one
+            # Here, we use the exact quality measure, which is sum of norms of strain tensors
             XBrs = [rotate(XB, theta) for (XB, theta) in zip(XB_lay, theta_comb)]
             sts = [self.__calc_strain_tensor_from_ADt(ADt, XBr) for XBr in XBrs]
             qty = sum([matnorm(st, *ord) for st in sts])
-            res = Heterostructure.__update_opt_res(res, theta_comb, qty, XA @ ADt, sts)
+            # Do not confuse with `Result`! This is tuple defined above
+            res = Heterostructure._update_opt_res(res, theta_comb, qty, XA @ ADt, sts)
 
+        # Recalculate the best ADt from `res`
         ADt = inv(XA) @ res[2]
         thetas = res[0]
         return thetas, ADt
 
-    def _prepare_A_inv(self, theta, XA, AB):
-        # inv is OK, since this will always be a 2x2 matrix
-        b1x, b1y, b2x, b2y = AB[0][0], AB[1][0], AB[0][1], AB[1][1]
-        costh, sinth = np.cos(theta), np.sin(theta)
-        rot_A = inv(XA) @ np.array([
-            [costh, -sinth],
-            [sinth, costh]
-        ]) @ XA
-        # TODO: better way to make this array?
-        return inv(np.array([
-            [rot_A[0, 0] * b1x + rot_A[0, 1] * b1y, rot_A[0, 0] * b2x + rot_A[0, 1] * b2y],
-            [rot_A[1, 0] * b1x + rot_A[1, 1] * b1y, rot_A[1, 0] * b2x + rot_A[1, 1] * b2y]
-        ]))
+    @staticmethod
+    def __is_ADt_acceptable(ADt: Matrix2x2, XA: Matrix2x2, XBs: List[Matrix2x2], thetas: List[float]) -> bool:
+        """
+        Checks if given ADt can be a solution
 
-    def _moire(self, dt_As, A_inv):
-        solution_vecs = matvecmul(A_inv, dt_As)
+        Parameters
+        ----------
+        ADt : Matrix2D
+        XA : Matrix2D
+        XBs : List[Matrix2D]
+            corresponds to layers of the heterostructure
+        thetas : List[float]
+            corresponds to layers of the heterostructure
+
+        Returns
+        -------
+        bool
+        """
+        # 1. Is det != 0 ?
+        if np.isclose(np.linalg.det(ADt), 0):
+            return False
+
+        # 2. Is det in any other basis == 0?
+        # This can happen when the solution to the equation in `_moire` is bad and gives
+        # e.g. values close to zero; this translates to impossible stretching of Br
+        XBrs = [rotate(XB, theta) for XB, theta in zip(XBs, thetas)]
+        BrDts = [inv(XBr) @ XA @ ADt for XBr in XBrs]
+        BtrDts = [np.round(BrDt) for BrDt in BrDts]
+        zero_dets = [x[0][0] * x[1][1] == x[0][1] * x[1][0] for x in BtrDts]
+        if any(zero_dets):
+            ADt[:, 1] = 0
+            return False
+
+        return True
+
+    def _moire(self, dt_As: np.ndarray, XA: Matrix2x2, XB: Matrix2x2, theta: float) -> np.ndarray:
+        """
+        Calculates qualities of each dt vector in dt_As,
+        where the measure of quality is a heuristic of
+        how much will the d vector be stretched for given dt
+        vector; the higher the quality the better.
+
+        For now as a measure of quality we use -|d - dt|^2
+
+        Parameters
+        ----------
+        dt_As : np.ndarray, shape (span, span, 2)
+            All possible potential dt vetors in A basis
+        XA : Matrix2D
+        XB : Matrix2D
+        theta : float
+
+        Returns
+        -------
+        qtys : np.ndarray, shape (span, span)
+            Quality of corresponding dt vectors
+        """
+        # T = rotation_matrix(theta) in A basis @ AB = AX @ rotation_matrix(theta) @ XA @ AB
+        # T_inv to solve equation [n1, n2] == T @ [m1, m2],
+        # where dt_i == n1 a_1 + n2 a_2 == m1 b_1 + m2 b_2
+        # this is a 2D matrix, so solving by inv is OK
+        T_inv = inv(XB) @ np.array([
+            [np.cos(theta), np.sin(theta)],
+            [-np.sin(theta), np.cos(theta)]
+        ]) @ XA
+
+        solution_vecs = matvecmul(T_inv, dt_As)
         qtys = -vecnorm(solution_vecs - np.round(solution_vecs), 2)
         return qtys
 
@@ -721,16 +821,16 @@ class Heterostructure:
         span_range[(max_el + 1):] -= 2 * max_el + 1
         dt_As = np.transpose(np.meshgrid(span_range, span_range))
 
-        dt_As[0, 0] = [0, 1] # Hack to remove "[0, 0]" vector
+        dt_As[0, 0] = [0, 1]  # Hack to remove "[0, 0]" vector
         return dt_As
 
     @staticmethod
-    def __update_opt_res(res: Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]],
-                         thetas: Tuple[Angle, ...],
-                         min_qty: float,
-                         XDt: np.ndarray,
-                         min_st: List[Matrix2x2]
-                         ) -> Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]]:
+    def _update_opt_res(res: Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]],
+                        thetas: Tuple[Angle, ...],
+                        min_qty: float,
+                        XDt: np.ndarray,
+                        min_st: List[Matrix2x2]
+                        ) -> Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]]:
         """
         Checks if newly calculated result is better than the previous one
         (this usually means that the strain measure `qty` is smaller),
@@ -797,7 +897,6 @@ class Heterostructure:
         XBs = [np.transpose(np.array(lay_desc[0].vectors())[0:2, 0:2])
                for lay_desc in self.__layers]
         return XA, XBs
-
 
 
 def heterostructure() -> Heterostructure:
