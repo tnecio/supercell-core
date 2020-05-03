@@ -439,13 +439,21 @@ class Lattice:
         self.__atoms = []
         self.add_atoms(atoms)
 
-    def draw(self, ax=None):
+    def draw(self, ax=None, cell_coords=None):
         """
         Requires matplotlib. Creates an image of the lattice elementary cell
         as a matplotlib plot.
 
         Parameters
         ----------
+        cell_coords : List[Vector2D], optional
+            Each point in `cell_coords` is an offset in Lattice vector basis.
+            For each of those offsets, all atoms in the cell will be drawn with
+            their positions moved by this offset. Use integer values to get
+            consistent drawings. Note: You can use things like [(-0.5, -0.5),
+             (-0.5, 0.5), (0.5, -0.5), (0.5, 0.5)] to get a picture of a translated
+             elementary cell.
+            Default: [(0, 0)] (draws just one elementary cell)
         ax : matplotlib axes.Axes object, optional
             If given, will draw the elementary cell to ax
 
@@ -458,6 +466,11 @@ class Lattice:
         Resulting axes has points labeled; use
         `ax.legend(loc='best')` to turn on the legend.
         """
+        if cell_coords is None:
+            cell_coords = [np.array([0, 0])]
+        else:
+            cell_coords = [np.array(pt) for pt in cell_coords]
+
         if ax is None:
             import matplotlib.pyplot as plt
             plt.clf()
@@ -488,16 +501,24 @@ class Lattice:
 
         for color, specie in zip(colors, species):
             atoms = [a for a in self.atoms() if a.element == specie]
-            ax.scatter([a.pos[0] for a in atoms],
-                       [a.pos[1] for a in atoms],
-                       marker='.',
-                       label=specie,
-                       color=color)
-            for a in atoms:
-                if a.spin[2] > 0:
-                    ax.annotate('↑', (a.pos[0], a.pos[1]))
-                elif a.spin[2] < 0:
-                    ax.annotate('↓', (a.pos[0], a.pos[1]))
+            positions = [a.pos for a in atoms]
+            v1, v2 = self.__XA[0:2, 0], self.__XA[0:2, 1]
+            for cell_coord in cell_coords:
+                positions_x = [p[0] + v1[0] * cell_coord[0] + v2[0] * cell_coord[1]
+                               for p in positions]
+                positions_y = [p[1] + v1[1] * cell_coord[0] + v2[1] * cell_coord[1]
+                               for p in positions]
+                ax.scatter(positions_x,
+                           positions_y,
+                           marker='.',
+                           label=specie,
+                           color=color)
+
+                for a, px, py in zip(atoms, positions_x, positions_y):
+                    if a.spin[2] > 0:
+                        ax.annotate('↑', (px, py))
+                    elif a.spin[2] < 0:
+                        ax.annotate('↓', (px, py))
 
         # Draw cell boundary
         vecs = np.array([v[0:2] for v in self.vectors()[0:2]])
