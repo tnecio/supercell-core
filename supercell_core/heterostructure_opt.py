@@ -38,12 +38,9 @@ class OptSolverConfig:
 
 class OptSolver:
     """
+
     TODO
     """
-    XA: Matrix2x2
-    XBs: List[Matrix2x2]
-    thetas: List[np.ndarray]  # List of arrays of floats, corresponding to XBs
-    config: OptSolverConfig
 
     def __init__(self,
                  XA: Matrix2x2,
@@ -52,8 +49,18 @@ class OptSolver:
                  config: OptSolverConfig):
         self.XA = XA
         self.XBs = XBs
-        self.thetas = thetas
+        self.thetas = thetas  # List of arrays of floats, corresponding to XBs
         self.config = config
+
+        # Prepare all possible dt vectors (in A basis)
+        self.dt_As = np.array([])
+        self.prepare_dt_As()
+
+        # Dummy start value for classic O(n) find min algorithm, we want to find
+        # values for which sum of `quality_fun`(strain tensor) is minimal
+        # (thetas, min_qty, XDt, strain_tensors)
+        self.res: Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]] = \
+            ([], np.inf, np.identity(2), [])
 
     def _calculate_strain_tensor(self, ADt: Matrix2x2, XBr: Matrix2x2) -> Matrix2x2:
         """
@@ -75,61 +82,22 @@ class OptSolver:
         BtrBr = BtrDt @ inv(BrDt)
         return BtrBr - np.identity(2)
 
-    @staticmethod
-    def _get_strain_tensor_wiki(XXt: Matrix2x2) -> np.ndarray:
+    def prepare_dt_As(self) -> None:
         """
-        Calculates strain tensor as defined in [1].
-
-        Parameters
-        ----------
-        XXt : Matrix2x2
+        Prepares dt_As for the calculation.
 
         Returns
         -------
-        Matrix 2x2
-
-        References
-        ----------
-        [1] https://en.wikipedia.org/wiki/Infinitesimal_strain_theory#Infinitesimal_strain_tensor
+        None
         """
-        # Notice that XXt = deformation gradient tensor (F)
-        # [1]
-        # https://en.wikipedia.org/wiki/Finite_strain_theory#Deformation_gradient_tensor
-        F = np.array(XXt)
-
-        # replace F with strain tensor
-        F += F.swapaxes(-1, -2)  # F + F^T
-        F /= 2
-        F -= np.identity(2)
-        return F
-
-    @abstractmethod
-    def solve(self) -> Tuple[List[float], Matrix2x2]:
-        pass
-
-
-class StrainOptimisator(OptSolver):
-    """
-    TODO: copy from supercell_core 0.0.6
-    """
-    def solve(self) -> Result:
-        pass
-
-
-class MoireFinder(OptSolver):
-    """
-    TODO
-    """
-
-    def get_result(self) -> Tuple[List[float], Matrix2x2]:
-        """
-        TODO
-        Returns:
-        ADt, thetas
-        """
-        thetas, min_qty, XDt, strain_tensors = self.res
-        ADt = inv(self.XA) @ XDt
-        return thetas, ADt
+        # Let's imagine all possible superlattice vectors (dt vectors). At the
+        # very least, they need to be able to recreate the substrate lattice.
+        # We assume substrate lattice to be constant.
+        # Thus every grid point in substrate basis (A) is a valid dt vector
+        span_range = np.arange(0, 2 * self.config.max_el + 1)
+        span_range[(self.config.max_el + 1):] -= 2 * self.config.max_el + 1
+        self.dt_As = np.transpose(np.meshgrid(span_range, span_range))
+        self.dt_As[0, 0] = [0, 1]  # Hack to remove "[0, 0]" vector
 
     def _update_opt_res(self,
                         thetas: Tuple[Angle, ...],
@@ -180,35 +148,126 @@ class MoireFinder(OptSolver):
         if np.max(np.abs(XDt)) < np.max(np.abs(self.res[2])):
             self.res = new_res
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # Prepare all possible dt vectors (in A basis)
-        self.dt_As = np.array([])
-        self.prepare_dt_As()
-
-        # Dummy start value for classic O(n) find min algorithm, we want to find
-        # values for which sum of `quality_fun`(strain tensor) is minimal
-        # (thetas, min_qty, XDt, strain_tensors)
-        self.res: Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]] = \
-            ([], np.inf, np.identity(2), [])
-
-    def prepare_dt_As(self) -> None:
+    def get_result(self) -> Tuple[List[float], Matrix2x2]:
         """
-        Prepares dt_As for the calculation.
+        TODO
+        Returns:
+        ADt, thetas
+        """
+        thetas, min_qty, XDt, strain_tensors = self.res
+        ADt = inv(self.XA) @ XDt
+        return thetas, ADt
+
+    @abstractmethod
+    def solve(self) -> Tuple[List[float], Matrix2x2]:
+        """
+        This routine calculates optimal supercell lattice vectors, layers'
+        rotation angles and their strain tensors. Here, optimal means
+        values that result in L_{1, 1} strain tensor norm to be smallest
+        :math:`L_{11}(\epsilon) = \max_{ij} |\epsilon_{ij}\` [1].
+        You can change used norm by setting appropriate value of `ord`
+        in object passed to `OptSolver.config`.
 
         Returns
         -------
-        None
+        thetas: List[float]
+            List of optimal theta values corresponding to the Heterostructure
+            layers. Length is equal to the number of layers.
+        ADt: Matrix2x2
+            Best ADt matrix found
         """
-        # Let's imagine all possible superlattice vectors (dt vectors). At the
-        # very least, they need to be able to recreate the substrate lattice.
-        # We assume substrate lattice to be constant.
-        # Thus every grid point in substrate basis (A) is a valid dt vector
-        span_range = np.arange(0, 2 * self.config.max_el + 1)
-        span_range[(self.config.max_el + 1):] -= 2 * self.config.max_el + 1
-        self.dt_As = np.transpose(np.meshgrid(span_range, span_range))
-        self.dt_As[0, 0] = [0, 1]  # Hack to remove "[0, 0]" vector
+        pass
+
+
+class StrainOptimisator(OptSolver):
+    """
+    TODO: copy from supercell_core 0.0.6
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dt_xs = matvecmul(self.XA, self.dt_As)
+        span = self.dt_As.shape[0]
+        self.ADts = np.empty((span, span, span, span, 2, 2))
+        self.ADts[..., 0] = self.dt_As[np.newaxis, np.newaxis, ...]
+        self.ADts[..., 1] = self.dt_As[..., np.newaxis, np.newaxis, :]
+
+    def _get_strain_tensors_opt(self,
+                                theta_comb: Tuple[float]) -> List[np.ndarray]:
+        """
+        Calculates strain tensor for `solve`.
+
+        Parameters
+        ----------
+        theta_comb : Tuple[float]
+            Length must correspond to self.XBs
+
+        Returns
+        -------
+        List[np.ndarray with shape (span, span, span, span, 2, 2)]
+
+        Notes
+        -----
+        Definiton of strain tensor here is the same as in documentation
+        for `calc`
+        """
+        return [self._calculate_strain_tensor(self.ADts, rotate(XB, theta))
+                for XB, theta in zip(self.XBs, theta_comb)]
+
+    def _get_d_xs(self,
+                  XB: np.ndarray,
+                  theta: Angle) -> np.ndarray:
+        """
+        Returns an array of `d` vectors in Cartesian basis
+
+        Parameters
+        ----------
+        XB : Matrix 2x2
+        theta : float
+
+        Returns
+        -------
+        np.ndarray, shape (..., 2)
+        """
+        XBr = rotate(XB, theta)
+        BrA = inv(XBr) @ self.XA
+        dt_Brs = matvecmul(BrA, self.dt_As)
+
+        # Here we use the fact that the supercell must "stretch" lattice vectors
+        # of constituent layers so that they superlattice vectors are linear
+        # _integer_ combinations of any one layers' lattice vectors.
+        dt_Btrs = np.round(dt_Brs)
+        d_Brs = dt_Btrs
+        return matvecmul(XBr, d_Brs)
+
+    def solve(self) -> Tuple[List[float], Matrix2x2]:
+        # embarrasingly parallel, but Python GIL makes this irrelevant
+        for theta_comb in itertools.product(*self.thetas):
+            strain_tensors = self._get_strain_tensors_opt(theta_comb)
+
+            # qty – array which contains norms of the strain tensors
+            qty = sum([matnorm(st, *self.config.ord) for st in strain_tensors])
+
+            # if qty is NaN it means that we somehow ended up with linear
+            # dependence; in the limit strain would go to infinity
+            qty[np.isnan(qty)] = np.inf
+
+            argmin_indices = np.unravel_index(qty.argmin(), qty.shape)
+            min_sts = [st[argmin_indices] for st in strain_tensors]
+            ADt = np.stack((self.dt_As[argmin_indices[0], argmin_indices[2]],
+                            self.dt_As[argmin_indices[1], argmin_indices[3]]))
+
+            # let's check if the best values for this combination of theta vals
+            # (theta_lay) are better than those we already have
+            self._update_opt_res(theta_comb, ADt, min_sts)
+
+        return self.get_result()
+
+
+class MoireFinder(OptSolver):
+    """
+    TODO
+    """
 
     def solve(self) -> Tuple[List[float], Matrix2x2]:
 

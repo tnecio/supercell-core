@@ -7,6 +7,7 @@ from .result import *
 from .calc import *
 from .heterostructure_opt import *
 
+
 class Heterostructure:
     """
     Class describing a system of a number of 2D crystals deposited
@@ -575,7 +576,8 @@ class Heterostructure:
 
     def opt(self,
             max_el: int = 6,
-            thetas: Optional[List[Optional[List[float]]]] = None
+            thetas: Optional[List[Optional[List[float]]]] = None,
+            algorithm: str = "moire"
             ) -> Result:
         """
         Minimises strain, and calculates its value.
@@ -599,12 +601,17 @@ class Heterostructure:
             of floats, without the need for nesting.
             All angles are in radians.
 
+        algorithm : str, optional
+            Default: "moire"
+            Accepted values: "moire", "brute"
+
         Returns
         -------
         Result
             Result object containing the results of the optimisation.
             For more information see documentation of `Result`
         """
+
         # TODO: the whole routine is pretty complex;
         #   maybe separate opt numerics into a class "MoireSolver" or stg.
         #   so we don't have to deal with passing XA, XB etc. all the time,
@@ -637,197 +644,12 @@ class Heterostructure:
         config.ord = (1, 1)
 
         XA, XBs = self.__get_lattice_matrices()
-        thetas, ADt = MoireFinder(XA, XBs, thetas_in, config).solve()
+        if algorithm == "moire":
+            thetas, ADt = MoireFinder(XA, XBs, thetas_in, config).solve()
+        else:  # "brute"
+            thetas, ADt = StrainOptimisator(XA, XBs, thetas_in, config).solve()
 
         return self.calc(ADt, thetas)
-
-    def __opt_aux(self,
-                  ord: Tuple[int, int],
-                  max_el: int,
-                  thetas_in: List[List[Angle]]) \
-            -> Tuple[List[Angle], Matrix2x2]:
-        """
-        This routine calculates optimal supercell lattice vectors, layers'
-        rotation angles and their strain tensors. Here, optimal means
-        values that result in L_{1, 1} strain tensor norm to be smallest
-        :math:`L_{11}(\epsilon) = \max_{ij} |\epsilon_{ij}\` [1]
-
-        Parameters
-        ----------
-        ord : (int, int)
-            (p, q) for calculating L_{p, q} norm of the strain tensor
-        max_el : int
-            Maximum absolute value of ADt matrix element
-        thetas_in : List[List[float]]
-            Must have length equal to the number of layers in the heterostructure.
-            Elements are lists or arrays containing possible values of thata for
-            a given layer.
-
-        Returns
-        -------
-        List[float]
-            List of optimal theta values corresponding to the Heterostructure
-            layers. Length is equal to the number of layers.
-        Matrix2x2
-            Best ADt matrix found
-        """
-
-        # prepare layer matrices
-        pass
-
-
-    @staticmethod
-    def __is_ADt_acceptable(ADt: Matrix2x2, XA: Matrix2x2, XBs: List[Matrix2x2], thetas: List[float]) -> bool:
-        """
-        Checks if given ADt can be a solution
-
-        Parameters
-        ----------
-        ADt : Matrix2D
-        XA : Matrix2D
-        XBs : List[Matrix2D]
-            corresponds to layers of the heterostructure
-        thetas : List[float]
-            corresponds to layers of the heterostructure
-
-        Returns
-        -------
-        bool
-        """
-        # 1. Is det != 0 ?
-        if np.isclose(np.linalg.det(ADt), 0):
-            return False
-
-        # 2. Is det in any other basis == 0?
-        # This can happen when the solution to the equation in `_moire` is bad and gives
-        # e.g. values close to zero; this translates to impossible stretching of Br
-        XBrs = [rotate(XB, theta) for XB, theta in zip(XBs, thetas)]
-        BrDts = [inv(XBr) @ XA @ ADt for XBr in XBrs]
-        BtrDts = [np.round(BrDt) for BrDt in BrDts]
-        zero_dets = [x[0][0] * x[1][1] == x[0][1] * x[1][0] for x in BtrDts]
-        if any(zero_dets):
-            ADt[:, 1] = 0
-            return False
-
-        return True
-
-    def _moire(self, dt_As: np.ndarray, XA: Matrix2x2, XB: Matrix2x2, theta: float) -> np.ndarray:
-        """
-        Calculates qualities of each dt vector in dt_As,
-        where the measure of quality is a heuristic of
-        how much will the d vector be stretched for given dt
-        vector; the higher the quality the better.
-
-        For now as a measure of quality we use -|d - dt|^2
-
-        Parameters
-        ----------
-        dt_As : np.ndarray, shape (span, span, 2)
-            All possible potential dt vetors in A basis
-        XA : Matrix2D
-        XB : Matrix2D
-        theta : float
-
-        Returns
-        -------
-        qtys : np.ndarray, shape (span, span)
-            Quality of corresponding dt vectors
-        """
-        # T = rotation_matrix(theta) in A basis @ AB = AX @ rotation_matrix(theta) @ XA @ AB
-        # T_inv to solve equation [n1, n2] == T @ [m1, m2],
-        # where dt_i == n1 a_1 + n2 a_2 == m1 b_1 + m2 b_2
-        # this is a 2D matrix, so solving by inv is OK
-        T_inv = inv(XB) @ np.array([
-            [np.cos(theta), np.sin(theta)],
-            [-np.sin(theta), np.cos(theta)]
-        ]) @ XA
-
-        solution_vecs = matvecmul(T_inv, dt_As) # dt_B
-        qtys = -vecnorm((solution_vecs - np.round(solution_vecs)), 1) / np.sqrt(vecnorm(solution_vecs, 2)) # TODO: better measure
-        # TOO self.__calc_strain_tensor_from_ADt(ADt, XBr)
-        return qtys
-
-    def _get_dt_As(self, max_el: int) -> np.ndarray:
-        """
-        Prepares dt_As for __opt_aux calculation.
-
-        Parameters
-        ----------
-        max_el : int
-            Maximum absolute value of ADt matrix element
-
-        Returns
-        -------
-        dt_As : np.ndarray, shape (span, span, 2)
-        """
-        # Let's imagine all possible superlattice vectors (dt vectors). At the
-        # very least, they need to be able to recreate the substrate lattice.
-        # We assume substrate lattice to be constant.
-        # Thus every grid point in substrate basis (A) is a valid dt vector
-        span_range = np.arange(0, 2 * max_el + 1)
-        span_range[(max_el + 1):] -= 2 * max_el + 1
-        dt_As = np.transpose(np.meshgrid(span_range, span_range))
-
-        dt_As[0, 0] = [0, 1]  # Hack to remove "[0, 0]" vector
-        return dt_As
-
-    @staticmethod
-    def _update_opt_res(res: Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]],
-                        thetas: Tuple[Angle, ...],
-                        min_qty: float,
-                        XDt: np.ndarray,
-                        min_st: List[Matrix2x2]
-                        ) -> Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]]:
-        """
-        Checks if newly calculated result is better than the previous one
-        (this usually means that the strain measure `qty` is smaller),
-        and if so updates it accordingly
-
-        Parameters
-        ----------
-        res : List[float], float, Matrix2x2, List[Matrix2x2]
-        thetas : Collection[float]
-        min_qty : float
-        XDt : Matrix2x2
-        min_st : List[Matrix2x2]
-
-        Returns
-        -------
-        List[float]
-        float
-        Matrix2x2
-        List[Matrix2x2]
-        """
-
-        # 1. Check for smaller supercell quality function
-
-        if min_qty - ABS_EPSILON > res[1]:
-            return res
-
-        thetas = list(thetas)
-        new_res = (thetas, min_qty, XDt, min_st)
-
-        # Here it is most efficient to check whether we aren't at the beginning
-        # (res[0] is None in that case)
-        if (min_qty + ABS_EPSILON < res[1]) or (res[0] is None):
-            return new_res
-
-        # 2. If qties are almost equal, choose smaller elementary cell
-
-        old_size = np.abs(np.linalg.det(res[2]))
-        new_size = np.abs(np.linalg.det(XDt))
-
-        if new_size < old_size - ABS_EPSILON:
-            return new_res
-        elif old_size < new_size - ABS_EPSILON:
-            return res
-
-        # 3. If even the sizes are equal, return the cell more 'square-y'
-        # here it will mean the cell with smaller |max_lattice_vector_element|
-
-        if np.max(np.abs(XDt)) < np.max(np.abs(res[2])):
-            return new_res
-        return res
 
     def __get_lattice_matrices(self):
         """
