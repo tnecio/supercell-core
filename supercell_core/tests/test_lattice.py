@@ -296,21 +296,32 @@ PRIMCOORD
 
     def test_draw(self):
         graphene = self.load_graphene()
-
         nips3 = sc.read_POSCAR(
             os.path.join(os.path.dirname(__file__),
                          "../resources/vasp/NiPS3/POSCAR"), ["Ni", "P", "S"],
             magmom=""
         )
 
-        fig, ax = graphene.draw()
-        fig.show()
+        def test_filesave(callback, expected_md5):
+            import hashlib
+            from io import BytesIO
 
+            outfile = BytesIO()
+            callback(outfile)
+            outfile.seek(0)
+            content = outfile.read()
+            self.assertEqual(expected_md5, hashlib.md5(content).hexdigest())
+            outfile.close()
+
+        # Graphene
+        fig, ax = graphene.draw()
+        test_filesave(fig.savefig, '5d1af27b61783e722a45e2990dc9c7d0')
+
+        # NiPS_3
         fig, ax = nips3.draw()
-        fig.show()
+        test_filesave(fig.savefig, '3061bcb600da108c9dcb678dcadbf0ff')
 
         # Two at the same time
         fig, ax = graphene.draw()
         fig, ax = nips3.draw(ax)
-        fig.show()
-
+        test_filesave(fig.savefig, '6dc6abe70d8ff04eda06e1f26c618377')

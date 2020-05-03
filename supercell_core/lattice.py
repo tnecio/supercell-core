@@ -361,7 +361,7 @@ class Lattice:
 
             # magmom
             magmom_str = " ".join([((str(x[1]) + "*" if x[1] > 1 else "")
-                                   + str(x[0])) for x in magmom])
+                                    + str(x[0])) for x in magmom])
             print("MAGMOM flag: " + magmom_str)
 
         return self
@@ -468,6 +468,7 @@ class Lattice:
         species = set()
         for a in self.atoms():
             species.add(a.element)
+        species = sorted(species, key=atomic_number)
 
         # A set of nice colours from ColorBrewer2.org
         colors = [
@@ -481,6 +482,9 @@ class Lattice:
             (247 / 255, 129 / 255, 191 / 255),
             (153 / 255, 153 / 255, 153 / 255)
         ]
+
+        # Hack if there is less colors than species
+        colors = colors * (len(species) // len(colors) + 1)
 
         for color, specie in zip(colors, species):
             atoms = [a for a in self.atoms() if a.element == specie]
