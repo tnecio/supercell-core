@@ -1,4 +1,4 @@
-from typing import List, Iterable
+from typing import List, Iterable, Dict, Any
 import itertools
 from abc import abstractmethod
 
@@ -51,6 +51,17 @@ class OptSolver:
         self.XBs = XBs
         self.thetas = thetas  # List of arrays of floats, corresponding to XBs
         self.config = config
+        if self.config.log:
+            if pd:
+                self.log = pd.DataFrame(columns=[
+                    *["theta_{}".format(i) for i in range(len(thetas))],
+                    "max_strain",
+                    "supercell_size",
+                    "M_11", "M_12", "M_21", "M_22"
+                ])
+            else:
+                print("Pandas not installed!")
+                self.config.log = False
 
         # Prepare all possible dt vectors (in A basis)
         self.dt_As = np.array([])
@@ -122,12 +133,24 @@ class OptSolver:
         min_qty = sum([matnorm(st, *self.config.ord) for st in min_st])
         XDt = self.XA @ ADt
 
+        # 0. Update log if necessary (TODO: tests, doc, make a warning if log=True and no pandas)
+        new_res = (list(thetas), min_qty, XDt, min_st)
+        new_size = np.abs(np.linalg.det(XDt))
+        if self.config.log:
+            new_row = {}
+            for i, theta in enumerate(thetas):
+                new_row["theta_{}".format(i)] = theta
+            new_row["max_strain"] = min_qty
+            new_row["supercell_size"] = new_size
+            new_row["M_11"] = XDt[0, 0]
+            new_row["M_12"] = XDt[0, 1]
+            new_row["M_21"] = XDt[1, 0]
+            new_row["M_22"] = XDt[1, 1]
+            self.log = self.log.append(new_row, ignore_index=True)
+
         # 1. Check for smaller supercell quality function
         if min_qty - ABS_EPSILON > self.res[1]:
             return
-
-        thetas = list(thetas)
-        new_res = (thetas, min_qty, XDt, min_st)
 
         # Here it is most efficient to check whether we aren't at the beginning
         # (res[0] is None in that case)
@@ -136,8 +159,6 @@ class OptSolver:
 
         # 2. If qties are almost equal, choose smaller elementary cell
         old_size = np.abs(np.linalg.det(self.res[2]))
-        new_size = np.abs(np.linalg.det(XDt))
-
         if new_size < old_size - ABS_EPSILON:
             self.res = new_res
         elif old_size < new_size - ABS_EPSILON:
@@ -148,7 +169,7 @@ class OptSolver:
         if np.max(np.abs(XDt)) < np.max(np.abs(self.res[2])):
             self.res = new_res
 
-    def get_result(self) -> Tuple[List[float], Matrix2x2]:
+    def get_result(self) -> Tuple[List[float], Matrix2x2, Dict[str, Any]]:
         """
         TODO
         Returns:
@@ -156,10 +177,14 @@ class OptSolver:
         """
         thetas, min_qty, XDt, strain_tensors = self.res
         ADt = inv(self.XA) @ XDt
-        return thetas, ADt
+
+        additional = {}
+        if self.config.log:
+            additional["log"] = self.log
+        return thetas, ADt, additional
 
     @abstractmethod
-    def solve(self) -> Tuple[List[float], Matrix2x2]:
+    def solve(self) -> Tuple[List[float], Matrix2x2, Dict[str, Any]]:
         """
         This routine calculates optimal supercell lattice vectors, layers'
         rotation angles and their strain tensors. Here, optimal means
@@ -240,7 +265,7 @@ class StrainOptimisator(OptSolver):
         d_Brs = dt_Btrs
         return matvecmul(XBr, d_Brs)
 
-    def solve(self) -> Tuple[List[float], Matrix2x2]:
+    def solve(self) -> Tuple[List[float], Matrix2x2, Dict[str, Any]]:
         # embarrasingly parallel, but Python GIL makes this irrelevant
         for theta_comb in itertools.product(*self.thetas):
             strain_tensors = self._get_strain_tensors_opt(theta_comb)
@@ -269,8 +294,7 @@ class MoireFinder(OptSolver):
     TODO
     """
 
-    def solve(self) -> Tuple[List[float], Matrix2x2]:
-
+    def solve(self) -> Tuple[List[float], Matrix2x2, Dict[str, Any]]:
         # Precalculate qualities of solutions here, since this problem is independent for
         # each layer; the final solution depends on a specific combination of thetas
         # but to calculate how much stretched the Br basis will be for each possible dt

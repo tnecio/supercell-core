@@ -577,7 +577,8 @@ class Heterostructure:
     def opt(self,
             max_el: int = 6,
             thetas: Optional[List[Optional[List[float]]]] = None,
-            algorithm: str = "moire"
+            algorithm: str = "moire",
+            log: bool = False
             ) -> Result:
         """
         Minimises strain, and calculates its value.
@@ -605,17 +606,19 @@ class Heterostructure:
             Default: "moire"
             Accepted values: "moire", "brute"
 
+        log : bool, optional
+            Default: False
+            If True, the Result will contain pandas.DataFrame in `log` attribute
+            The resulting DataFrame will contain information on supercell for every
+            combination of interlayer angles considered.
+            Requires `pandas` extra dependency
+
         Returns
         -------
         Result
             Result object containing the results of the optimisation.
             For more information see documentation of `Result`
         """
-
-        # TODO: the whole routine is pretty complex;
-        #   maybe separate opt numerics into a class "MoireSolver" or stg.
-        #   so we don't have to deal with passing XA, XB etc. all the time,
-        #   and the mess in Heterostructure
 
         # Prepare ranges of theta values
         def is_iterable(x):
@@ -642,14 +645,18 @@ class Heterostructure:
         config = OptSolverConfig()
         config.max_el = max_el
         config.ord = (1, 1)
+        config.log = log
 
         XA, XBs = self.__get_lattice_matrices()
         if algorithm == "moire":
-            thetas, ADt = MoireFinder(XA, XBs, thetas_in, config).solve()
+            thetas, ADt, additional = MoireFinder(XA, XBs, thetas_in, config).solve()
         else:  # "brute"
-            thetas, ADt = StrainOptimisator(XA, XBs, thetas_in, config).solve()
+            thetas, ADt, additional = StrainOptimisator(XA, XBs, thetas_in, config).solve()
 
-        return self.calc(ADt, thetas)
+        res = self.calc(ADt, thetas)
+        if log:
+            res.log = additional["log"]
+        return res
 
     def __get_lattice_matrices(self):
         """

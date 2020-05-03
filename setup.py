@@ -11,7 +11,7 @@ def readme():
 
 setuptools.setup(
     name='supercell_core',
-    version='0.1.1',
+    version='0.1.3',
     packages=setuptools.find_packages(),
     url='https://github.com/tnecio/supercell-core',
     license='GPLv3',
@@ -31,5 +31,11 @@ setuptools.setup(
     install_requires=[
         'numpy',
         'matplotlib'
-    ]
+    ],
+    # TODO: doc
+    extras_require={
+        'log' : [
+            'pandas'
+        ]
+    }
 )
