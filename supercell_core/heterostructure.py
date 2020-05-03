@@ -5,7 +5,7 @@ from .lattice import Lattice
 from .physics import *
 from .result import *
 from .calc import *
-
+from .heterostructure_opt import *
 
 class Heterostructure:
     """
@@ -631,7 +631,13 @@ class Heterostructure:
 
         # Using (1, 1) norm since we are usually interested in minimising
         # |strain_ij| over i, j (where 'strain' is strain tensor)
-        thetas, ADt = self.__opt_aux((1, 1), max_el, thetas_in)
+
+        config = OptSolverConfig()
+        config.max_el = max_el
+        config.ord = (1, 1)
+
+        XA, XBs = self.__get_lattice_matrices()
+        thetas, ADt = MoireFinder(XA, XBs, thetas_in, config).solve()
 
         return self.calc(ADt, thetas)
 
@@ -667,68 +673,8 @@ class Heterostructure:
         """
 
         # prepare layer matrices
-        XA, XB_lay = self.__get_lattice_matrices()
-        dt_As = self._get_dt_As(max_el)
+        pass
 
-        # Precalculate qualities of solutions here, since this problem is independent for
-        # each layer; the final solution depends on a specific combination of thetas
-        # but to calculate how much stretched the Br basis will be for each possible dt
-        # vector will be we only need to know the Br (theta + XB)
-        # Complexity: O(thetas_len * no. layers * max_el ** 2)
-        memo = {}
-        for thetas, (i, XB) in zip(thetas_in, enumerate(XB_lay)):
-            for theta in thetas:
-                qtys = self._moire(dt_As, XA, XB, theta)
-                memo[float(theta), i] = qtys
-
-        # Dummy start value for classic O(n) find min algorithm, we want to find
-        # values for which sum of `quality_fun`(strain tensor) is minimal
-        res: Tuple[List[Angle], float, Matrix2x2, List[Matrix2x2]] = \
-            (None, np.inf, None, None)
-
-        # We need to have this loop over all possible combinations since
-        # ADt is one for the whole structure and must minimise strains in
-        # all layers simulatneously
-        # Complexity: O(thetas_len ** no. layers * max_el ** 2)
-        # Could probably use a few tricks to get it down to stg like O(thetas_len ** no. layers)
-        # or at least O(thetas_len ** no. layers * max_el)
-        for theta_comb in itertools.product(*thetas_in):
-            qtyss = [memo[float(theta), i] for i, theta in enumerate(theta_comb)]
-            qtys_total = sum(qtyss)
-
-            ADt = np.zeros((2, 2))
-            # This loop is in practice O(1) since the number of vectors giving singular ADt
-            # is O(max_el) and then, if for one such vector the qty != 0 then it's very
-            # unprobable that the second one will happen to be parallel
-            while all(ADt[:, 0] == 0) or all(ADt[:, 1] == 0):
-                argmax_indices = np.unravel_index(qtys_total.argmax(), qtys_total.shape)
-                qtys_total[argmax_indices] = -np.inf  # removes this vector from "search pool"
-                vec = dt_As[argmax_indices]
-
-                if all(ADt[:, 0] == 0):
-                    ADt[:, 0] = vec
-                else:
-                    ADt[:, 1] = vec
-                    if not self.__is_ADt_acceptable(ADt, XA, XB_lay, theta_comb):
-                        # Back off from adding this vec
-                        ADt[:, 1] = 0
-                    # Note: we always use the best candidate vec and only consider
-                    # the second one (ADt[:. 1]) suspicious because if it is in fact bad
-                    # the it must be almost-parallel or parallel to the first one, so
-                    # it doesn't matter much which one we pick to stay
-
-            # Check if result for this angle combination is better than for the previous one
-            # Here, we use the exact quality measure, which is sum of norms of strain tensors
-            XBrs = [rotate(XB, theta) for (XB, theta) in zip(XB_lay, theta_comb)]
-            sts = [self.__calc_strain_tensor_from_ADt(ADt, XBr) for XBr in XBrs]
-            qty = sum([matnorm(st, *ord) for st in sts])
-            # Do not confuse with `Result`! This is tuple defined above
-            res = Heterostructure._update_opt_res(res, theta_comb, qty, XA @ ADt, sts)
-
-        # Recalculate the best ADt from `res`
-        ADt = inv(XA) @ res[2]
-        thetas = res[0]
-        return thetas, ADt
 
     @staticmethod
     def __is_ADt_acceptable(ADt: Matrix2x2, XA: Matrix2x2, XBs: List[Matrix2x2], thetas: List[float]) -> bool:
@@ -796,8 +742,9 @@ class Heterostructure:
             [-np.sin(theta), np.cos(theta)]
         ]) @ XA
 
-        solution_vecs = matvecmul(T_inv, dt_As)
-        qtys = -vecnorm(solution_vecs - np.round(solution_vecs), 2)
+        solution_vecs = matvecmul(T_inv, dt_As) # dt_B
+        qtys = -vecnorm((solution_vecs - np.round(solution_vecs)), 1) / np.sqrt(vecnorm(solution_vecs, 2)) # TODO: better measure
+        # TOO self.__calc_strain_tensor_from_ADt(ADt, XBr)
         return qtys
 
     def _get_dt_As(self, max_el: int) -> np.ndarray:
