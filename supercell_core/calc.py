@@ -107,7 +107,7 @@ def matnorm(m: np.ndarray, p: float, q: float) -> np.ndarray:
 
     Useful norms for strain calculations:
     Frobenius norm: ord_p = ord_q = 2
-    Max norm: ord_p = ord_q = np.inf
+    Absolute sum of elements: ord_p = ord_q = 1
 
     References
     ----------

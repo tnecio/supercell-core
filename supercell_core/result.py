@@ -117,7 +117,8 @@ class Result:
     def M(self) -> Matrix2x2:
         """
         Returns 2D matrix M: M @ (v in supercell basis) = (v in substrate lattice
-        basis). All matrix components are integers.
+        basis). In other words, matrix composed of superlattice vectors
+        in substrate lattice basis. All matrix components are integers.
 
         Returns
         -------
@@ -129,6 +130,8 @@ class Result:
         """
         Returns list of matrices Mi: Mi @ (v in supercell basis) = (v in basis
         of heterostructure layer no. i when it is stretched due to strain).
+        In other words, list of matrices composed of superlattice
+        vectors in stretched layers' lattice basis.
         All matrix components are integers.
 
         Returns
