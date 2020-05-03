@@ -57,7 +57,9 @@ class OptSolver:
                     *["theta_{}".format(i) for i in range(len(thetas))],
                     "max_strain",
                     "supercell_size",
-                    "M_11", "M_12", "M_21", "M_22"
+                    "M_11", "M_12", "M_21", "M_22",
+                    "supercell_vectors_11", "supercell_vectors_12",
+                    "supercell_vectors_21", "supercell_vectors_22"
                 ])
             else:
                 print("Pandas not installed!")
@@ -142,10 +144,10 @@ class OptSolver:
                 new_row["theta_{}".format(i)] = theta
             new_row["max_strain"] = min_qty
             new_row["supercell_size"] = new_size
-            new_row["M_11"] = XDt[0, 0]
-            new_row["M_12"] = XDt[0, 1]
-            new_row["M_21"] = XDt[1, 0]
-            new_row["M_22"] = XDt[1, 1]
+            for i in range(2):
+                for j in range(2):
+                    new_row["M_{}{}".format(i + 1, j + 1)] = ADt[i, j]
+                    new_row["supercell_vectors_{}{}".format(i + 1, j + 1)] = XDt[i, j]
             self.log = self.log.append(new_row, ignore_index=True)
 
         # 1. Check for smaller supercell quality function
