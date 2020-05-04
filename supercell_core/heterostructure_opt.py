@@ -52,18 +52,22 @@ class OptSolver:
         self.thetas = thetas  # List of arrays of floats, corresponding to XBs
         self.config = config
         if self.config.log:
-            if pd:
-                self.log = pd.DataFrame(columns=[
-                    *["theta_{}".format(i) for i in range(len(thetas))],
-                    "max_strain",
-                    "supercell_size",
-                    "M_11", "M_12", "M_21", "M_22",
-                    "supercell_vectors_11", "supercell_vectors_12",
-                    "supercell_vectors_21", "supercell_vectors_22"
-                ])
-            else:
-                print("Pandas not installed!")
-                self.config.log = False
+            self.log = {}
+            columns = [
+                *["theta_{}".format(i) for i in range(len(thetas))],
+                "max_strain",
+                "supercell_size",
+                "M_11", "M_12", "M_21", "M_22",
+                "supercell_vectors_11", "supercell_vectors_12",
+                "supercell_vectors_21", "supercell_vectors_22",
+                *["strain_tensor_layer_{}_{}{}".format(k + 1, i + 1, j + 1)
+                  for k in range(len(thetas))
+                  for i in range(2) for j in range(2)]
+            ]
+            for column in columns:
+                self.log[column] = []
+            if pd is None:
+                print("Pandas not installed! Returning a dictionary instead (log)")
 
         # Prepare all possible dt vectors (in A basis)
         self.dt_As = np.array([])
@@ -115,7 +119,7 @@ class OptSolver:
     def _update_opt_res(self,
                         thetas: Tuple[Angle, ...],
                         ADt: np.ndarray,
-                        min_st: List[Matrix2x2]
+                        sts: List[Matrix2x2]
                         ) -> None:
         """
         Checks if newly calculated result is better than the previous one
@@ -126,29 +130,31 @@ class OptSolver:
         ----------
         thetas : Collection[float]
         ADt : Matrix2x2
-        min_st : List[Matrix2x2]
+        sts : List[Matrix2x2]
 
         Returns
         -------
         None
         """
-        min_qty = sum([matnorm(st, *self.config.ord) for st in min_st])
+        min_qty = sum([matnorm(st, *self.config.ord) for st in sts])
         XDt = self.XA @ ADt
 
         # 0. Update log if necessary (TODO: tests, doc, make a warning if log=True and no pandas)
-        new_res = (list(thetas), min_qty, XDt, min_st)
+        new_res = (list(thetas), min_qty, XDt, sts)
         new_size = np.abs(np.linalg.det(XDt))
         if self.config.log:
-            new_row = {}
             for i, theta in enumerate(thetas):
-                new_row["theta_{}".format(i)] = theta
-            new_row["max_strain"] = min_qty
-            new_row["supercell_size"] = new_size
+                self.log["theta_{}".format(i)].append(theta)
+            self.log["max_strain"].append(min_qty)
+            self.log["supercell_size"].append(new_size)
             for i in range(2):
                 for j in range(2):
-                    new_row["M_{}{}".format(i + 1, j + 1)] = ADt[i, j]
-                    new_row["supercell_vectors_{}{}".format(i + 1, j + 1)] = XDt[i, j]
-            self.log = self.log.append(new_row, ignore_index=True)
+                    self.log["M_{}{}".format(i + 1, j + 1)].append(ADt[i, j])
+                    self.log["supercell_vectors_{}{}".format(i + 1, j + 1)].append(XDt[i, j])
+                    for k, st in enumerate(sts):
+                        self.log["strain_tensor_layer_{}_{}{}".format(k + 1, i + 1, j + 1)].append(
+                            sts[k][i, j]
+                        )
 
         # 1. Check for smaller supercell quality function
         if min_qty - ABS_EPSILON > self.res[1]:
@@ -182,6 +188,8 @@ class OptSolver:
 
         additional = {}
         if self.config.log:
+            if pd is not None:
+                self.log = pd.DataFrame(self.log)
             additional["log"] = self.log
         return thetas, ADt, additional
 
