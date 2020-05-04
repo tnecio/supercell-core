@@ -123,6 +123,29 @@ class Lattice:
 
         return self
 
+    def rotate(self, theta: float):
+        """
+        Rotates the lattice around the origin.
+
+        Parameters
+        ----------
+        theta : float
+            Angle in radians
+
+        Returns
+        -------
+        Lattice
+            for chaining
+        """
+        # TODO: tests
+        vecs = self.vectors()
+        v1 = vecs[0][0:2]
+        v2 = vecs[1][0:2]
+        v1 = rotate(v1, theta)
+        v2 = rotate(v2, theta)
+        self.set_vectors(v1, v2, atoms_behaviour=Unit.Crystal)
+        return self
+
     def vectors(self) -> List[VectorNumpy]:
         """
         Lists lattice vectors
