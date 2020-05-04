@@ -486,7 +486,7 @@ class Lattice:
         # A set of nice colours from ColorBrewer2.org
         colors = [
             (228 / 255, 26 / 255, 28 / 255),
-            (55 / 255, 126 / 255, 184 / 255),
+            #(55 / 255, 126 / 255, 184 / 255),
             (77 / 255, 175 / 255, 74 / 255),
             (152 / 255, 78 / 255, 163 / 255),
             (255 / 255, 127 / 255, 0 / 255),
@@ -510,7 +510,8 @@ class Lattice:
                                for p in positions]
                 ax.scatter(positions_x,
                            positions_y,
-                           marker='.',
+                           marker='o',
+                           s=2,
                            label=specie,
                            color=color)
 
@@ -523,7 +524,8 @@ class Lattice:
         # Draw cell boundary
         vecs = np.array([v[0:2] for v in self.vectors()[0:2]])
         pts = np.array([(0, 0), vecs[0], vecs[0] + vecs[1], vecs[1], (0, 0)]).T
-        ax.plot(pts[0], pts[1], '--', color="gray")
+        ax.plot(pts[0], pts[1], '--', color=(55 / 255, 126 / 255, 184 / 255),
+                linewidth=2) # orig. "gray"
 
         ax.set_aspect('equal', adjustable='box')
         return fig, ax
