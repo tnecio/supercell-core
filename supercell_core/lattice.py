@@ -111,9 +111,10 @@ class Lattice:
         new_vectors = np.array(args).T
         self.__XA[0:len(args[0]), 0:len(args)] = new_vectors
         if np.isclose(np.linalg.det(self.__XA), 0):
+            bad_XA = self.__XA
             self.__XA = old_XA
-            raise LinearDependenceError
-
+            raise LinearDependenceError("{}".format(bad_XA))
+        
         if atoms_behaviour == Unit.Angstrom:
             for i, a in enumerate(self.__atoms):
                 self.__atoms[i] = Atom(a.element,

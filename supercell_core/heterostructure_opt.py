@@ -287,10 +287,16 @@ class StrainOptimisator(OptSolver):
             # dependence; in the limit strain would go to infinity
             qty[np.isnan(qty)] = np.inf
 
-            argmin_indices = np.unravel_index(qty.argmin(), qty.shape)
-            min_sts = [st[argmin_indices] for st in strain_tensors]
-            ADt = np.stack((self.dt_As[argmin_indices[0], argmin_indices[2]],
-                            self.dt_As[argmin_indices[1], argmin_indices[3]]))
+            linalg_fix = True # sometimes we get a linearly dependent ADt anyway, TODO: why
+            while linalg_fix:
+                argmin_indices = np.unravel_index(qty.argmin(), qty.shape)
+                min_sts = [st[argmin_indices] for st in strain_tensors]
+                ADt = np.stack((self.dt_As[argmin_indices[0], argmin_indices[2]],
+                                self.dt_As[argmin_indices[1], argmin_indices[3]]))
+                if np.isclose(np.linalg.det(ADt), 0):
+                    qty[argmin_indices] = np.inf
+                else:
+                    linalg_fix = False
 
             # let's check if the best values for this combination of theta vals
             # (theta_lay) are better than those we already have
