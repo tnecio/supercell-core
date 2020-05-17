@@ -24,7 +24,7 @@ class Heterostructure:
     lattice. `Heterostructure` describes a collection of crystals that build
     up the structure; to obtain the crystal lattice resulting from joining
     these crystals you must first define a way in which these crystals come
-    together (angles, etc. – use `opt` or `res` methods to do this),
+    together (angles, etc. – use `opt` or `calc` methods to do this),
     and the resulting lattice will be available as `supercell` attribute
     of the `Result` class (see documentation of the relevant methods)
     """
@@ -154,10 +154,10 @@ class Heterostructure:
 
         Parameters
         ----------
-        layers : List[
-            Lattice,res.set_vectors()
-            or (Lattice, float),
-            or (Lattice, (float, float, float))
+        layers : List[ \
+            Lattice,res.set_vectors() \
+            or (Lattice, float), \
+            or (Lattice, (float, float, float)) \
         ]
             List of layers to add to the structure.
             If list element is a tuple, the second element serves the same way
