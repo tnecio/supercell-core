@@ -463,7 +463,7 @@ class Lattice:
         self.__atoms = []
         self.add_atoms(atoms)
 
-    def draw(self, ax=None, cell_coords=None):
+    def draw(self, ax=None, cell_coords=None, scatter_kwargs=None, border_kwargs=None):
         """
         Requires matplotlib. Creates an image of the lattice elementary cell
         as a matplotlib plot.
@@ -502,6 +502,18 @@ class Lattice:
         else:
             fig = ax.figure
 
+        if scatter_kwargs is None:
+            scatter_kwargs = {
+                "marker": '.',
+                "s": 2
+            }
+        if border_kwargs is None:
+            border_kwargs = {
+                "linestyle": '--',
+                "color": (55 / 255, 126 / 255, 184 / 255),  # orig. "gray"
+                "linewidth": 2
+            }
+
         species = set()
         for a in self.atoms():
             species.add(a.element)
@@ -534,10 +546,9 @@ class Lattice:
                                for p in positions]
                 ax.scatter(positions_x,
                            positions_y,
-                           marker='o',
-                           s=2,
                            label=specie,
-                           color=color)
+                           color=color,
+                           **scatter_kwargs)
 
                 for a, px, py in zip(atoms, positions_x, positions_y):
                     if a.spin[2] > 0:
@@ -548,8 +559,8 @@ class Lattice:
         # Draw cell boundary
         vecs = np.array([v[0:2] for v in self.vectors()[0:2]])
         pts = np.array([(0, 0), vecs[0], vecs[0] + vecs[1], vecs[1], (0, 0)]).T
-        ax.plot(pts[0], pts[1], '--', color=(55 / 255, 126 / 255, 184 / 255),
-                linewidth=2) # orig. "gray"
+
+        ax.plot(pts[0], pts[1], **border_kwargs)
 
         ax.set_aspect('equal', adjustable='box')
         return fig, ax
