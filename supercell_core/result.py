@@ -3,7 +3,7 @@ import numpy as np
 
 from .lattice import Lattice
 from .physics import Angle, Matrix2x2
-from .calc import inv
+from .calc import inv, matnorm
 
 
 class Result:
@@ -112,7 +112,7 @@ class Result:
         """
         # sum instead of np.sum because we want to add matrices in a list,
         # not sum all elements of these matrices
-        return np.max(np.abs(sum(self.strain_tensors())))
+        return sum([matnorm(st, 1, 1) for st in self.strain_tensors()])
 
     def M(self) -> Matrix2x2:
         """
