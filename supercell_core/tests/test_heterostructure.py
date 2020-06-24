@@ -79,10 +79,10 @@ class TestHeterostructure(ut.TestCase):
         # graphene-NiPS3 low-strain angle 21.9, theta range 16-30-0.1
         graphene = sc.read_POSCAR(
             path.join(path.dirname(__file__), "../resources/vasp/graphene/POSCAR"),
-            ["C"])
+            atomic_species=["C"])
         nips3 = sc.read_POSCAR(
             path.join(path.dirname(__file__), "../resources/vasp/NiPS3/POSCAR"),
-            ["Ni", "P", "S"]
+            atomic_species=["Ni", "P", "S"]
         )
 
         h = sc.heterostructure()
@@ -107,7 +107,7 @@ class TestHeterostructure(ut.TestCase):
     def test_opt_graphene_moire(self):
         graphene = sc.read_POSCAR(
             path.join(path.dirname(__file__), "../resources/vasp/graphene/POSCAR"),
-            ["C"])
+            atomic_species=["C"])
 
         h = sc.heterostructure()
         h.set_substrate(graphene)

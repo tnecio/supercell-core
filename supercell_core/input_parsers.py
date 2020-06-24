@@ -7,25 +7,15 @@ from .heterostructure import Heterostructure
 
 
 def read_POSCAR(filename: str,
-                atomic_species: List[str],
-                magmom: Optional[str] = None,
-                normalise_positions: Optional[bool] = False) -> Lattice:
+                **kwargs) -> Lattice:
     """
     Reads VASP input file "POSCAR"
 
     Parameters
     ----------
     filename : str
-    atomic_species : List[str]
-        Contains symbols of chemical elements in the same order as in POTCAR
-        One symbol per atomic species
-    magmom : str, optional
-        Contents of the MAGMOM line from INCAR file.
-        Default: all spins set to zero
-    normalise_positions : bool, optional
-        If True, atomic positions are moved to be within the elementary cell
-        (preserving location of atoms in the whole crystal)
-        Default: False
+    kwargs
+        Passed on to `parse_POSCAR`
 
     Returns
     -------
@@ -45,8 +35,7 @@ def read_POSCAR(filename: str,
         # I don't think there is any reasonable POSCAR with > 1000 atoms
         # so s will be at most a few tens of thousands of kB, so just read() it
         s = f.read()
-    return parse_POSCAR(s, atomic_species, magmom,
-                        normalise_positions=normalise_positions)
+    return parse_POSCAR(s, **kwargs)
 
 
 # Helper functions for parser to make the code read better
@@ -82,7 +71,7 @@ def iter_magmom(magmom: str):
 
 
 def parse_POSCAR(poscar: str,
-                 atomic_species: List[str],
+                 atomic_species: List[str] = None,
                  magmom: Optional[str] = None,
                  normalise_positions: Optional[bool] = False) -> Lattice:
     """
@@ -96,6 +85,7 @@ def parse_POSCAR(poscar: str,
     atomic_species : List[str]
         Contains symbols of chemical elements in the same order as in POTCAR
         One symbol per atomic species
+        Required if the POSCAR file does not specify the atomic species
     magmom : str, optional
         Contents of the MAGMOM line from INCAR file.
         Default: all spins set to zero
@@ -141,42 +131,40 @@ def parse_POSCAR(poscar: str,
 
         res.set_vectors(*vecs)
 
-        # 6: atomic species counts
+        # 6 (optional): atomic species names
         line = get_line(s).split()
-        as_counts = []
+        # Heuristic for species names – failure to parse as int
+        try:
+            int(line[0])
+        except:
+            if atomic_species is None:
+                atomic_species = line
+            line = get_line(s).split()
+            s = eat_line(s)
+
+        # 7: atomic species counts
         if len(line) != len(atomic_species):
             raise ParseError("Number of atomic species doesn't match ({} != {})".format(
                 len(get_line(s).split()), len(atomic_species)
             ))
 
-        # Note: VASP will output here (and read correctly) a line with names of
-        # the atomic species; This is an undocumented feature of VASP
-        # so files written by supercell_core don't contain this line; However,
-        # we must check if this line exist and if so, ommit it.
-        # (in the future we might check its contents against `atomic_species`)
-        try:
-            int(line[0])
-        except ValueError:
-            s = eat_line(s)
-
-        for x in get_line(s).split():
-            as_counts.append(int(x.strip()))
+        as_counts = [int(x.strip()) for x in get_line(s).split()]
         s = eat_line(s)
 
-        # 7: possibly Selective Dynamics, then remember to ignore Ts and Fs
+        # 8: possibly Selective Dynamics, then remember to ignore Ts and Fs
         # at the ends of positions
         selective_dynamics = False
         if get_line(s)[0] in "Ss":
             s = eat_line(s)
             selective_dynamics = True
 
-        # 8: Cartesian or Direct
+        # 9: Cartesian or Direct
         unit = Unit.Crystal
         if get_line(s)[0] in "CcKk":
             unit = Unit.Angstrom
         s = eat_line(s)
 
-        # 9+: atomic positions
+        # 10+: atomic positions
         if magmom:
             spins = iter_magmom(magmom)
         else:

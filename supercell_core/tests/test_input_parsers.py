@@ -10,7 +10,7 @@ from ..input_parsers import *
 class TestInputParsers(ut.TestCase):
     def test_read_POSCAR_IO_fail(self):
         with self.assertRaises(IOError):
-            sc.read_POSCAR("csnadkjndksca", [])
+            sc.read_POSCAR("csnadkjndksca")
 
     def test_parse_POSCAR_1(self):
         example_poscar = """whatever

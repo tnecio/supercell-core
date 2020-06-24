@@ -1,10 +1,6 @@
 from typing import Optional, List
-import itertools
 
 from .lattice import Lattice
-from .physics import *
-from .result import *
-from .calc import *
 from .heterostructure_opt import *
 
 
