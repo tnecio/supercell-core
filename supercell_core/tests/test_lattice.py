@@ -207,6 +207,7 @@ class TestLattice(ut.TestCase):
 1 2 3
 0.5 0.7 0.91
 3 1 0
+Fe Zn
 1 6
 Direct
 -21.84 72 -4.72
@@ -231,8 +232,6 @@ Direct
         with patch('sys.stdout', new=StringIO()) as fakeOutput:
             lay.save_POSCAR()
             self.assertEqual(fakeOutput.getvalue(), expected_poscar + "\n" + \
-                             "Note: The order of the atomic species in this generated POSCAR " + \
-                             "file is as follows:\n" + " ".join(names) + "\n" + \
                              "MAGMOM flag: 0 2*1 2*0 2*-1\n")
             # TODO: test sorting by z-spin in atomic species
 

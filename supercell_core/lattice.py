@@ -340,6 +340,11 @@ class Lattice:
                 atomic_species[a.element] = [a]
                 names.append(a.element)
 
+        # New in VASP December 2019 – atomic species names
+        for name in names:
+            s += "{} ".format(name)
+        s = s[:-1] + '\n'
+
         for name in names:
             atoms_list = atomic_species[name]
             s += "{} ".format(len(atoms_list))
@@ -380,9 +385,6 @@ class Lattice:
             print(s)
 
         if not silent:
-            print("Note: The order of the atomic species in this generated " +
-                  "POSCAR file is as follows:\n" + " ".join(names))
-
             # magmom
             magmom_str = " ".join([((str(x[1]) + "*" if x[1] > 1 else "")
                                     + str(x[0])) for x in magmom])
