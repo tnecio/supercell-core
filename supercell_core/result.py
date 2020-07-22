@@ -52,7 +52,8 @@ class Result:
                  strain_tensors: List[Matrix2x2],
                  strain_tensors_wiki: List[Matrix2x2],
                  ADt: Matrix2x2,
-                 ABtrs: List[Matrix2x2]):
+                 ABtrs: List[Matrix2x2],
+                 atom_count = None):
         """
 
         Parameters
@@ -73,6 +74,7 @@ class Result:
         self.__strain_tensors_wiki = strain_tensors_wiki
         self.__ADt = ADt
         self.__ABtrs = ABtrs
+        self.__atom_count = len(self.superlattice().atoms()) if atom_count is None else atom_count
 
     def strain_tensors(self, wiki_definition=False) -> \
             List[Matrix2x2]:
@@ -148,7 +150,7 @@ class Result:
         -------
         int
         """
-        return len(self.superlattice().atoms())
+        return self.__atom_count
 
     def superlattice(self) -> Lattice:
         """

@@ -257,9 +257,28 @@ class Heterostructure:
 
     ### CALC METHODS
 
+    def __calc_strain_tensor_from_ADt(self, ADt: Matrix2x2, XBr: Matrix2x2) -> Matrix2x2:
+        """
+        Calculate strain tensor.
+
+        See docs of `Heterostructure.calc` for definition of strain tensor.
+
+        Parameters
+        ----------
+        ADt : Matrix 2x2
+        XBr : Matrix 2x2
+
+        Returns
+        -------
+        Matrix 2x2
+        """
+        BrDt, BtrBr, XXt = self.__get_basis_change_matrices(ADt, XBr)
+        return Heterostructure.__calc_strain_tensor(XBr, XXt)
+
     def calc(self,
              M=((1, 0), (0, 1)),
-             thetas=None) -> Result:
+             thetas=None,
+             calc_atoms=True) -> Result:
         """
         Calculates strain tensor and other properties of the system in given
         circumstances
@@ -320,25 +339,7 @@ class Heterostructure:
             thetas = [lay_desc[1][0] for lay_desc in self.__layers]
 
         ADt = np.array(M)
-        return self.__calc_aux(ADt, thetas)
-
-    def __calc_strain_tensor_from_ADt(self, ADt: Matrix2x2, XBr: Matrix2x2) -> Matrix2x2:
-        """
-        Calculate strain tensor.
-
-        See docs of `Heterostructure.calc` for definition of strain tensor.
-
-        Parameters
-        ----------
-        ADt : Matrix 2x2
-        XBr : Matrix 2x2
-
-        Returns
-        -------
-        Matrix 2x2
-        """
-        BrDt, BtrBr, XXt = self.__get_basis_change_matrices(ADt, XBr)
-        return Heterostructure.__calc_strain_tensor(XBr, XXt)
+        return self.__calc_aux(ADt, thetas, calc_atoms=calc_atoms)
 
     def __get_basis_change_matrices(self, ADt, XBr):
         """
@@ -363,7 +364,8 @@ class Heterostructure:
 
     def __calc_aux(self,
                    ADt: InMatrix2x2,
-                   thetas: List[Angle]) -> Result:
+                   thetas: List[Angle],
+                   calc_atoms: bool) -> Result:
         """
         Calculates strain tensor and other properties of the system in given
         circumstances
@@ -401,7 +403,14 @@ class Heterostructure:
         strain_tensors_wiki = [Heterostructure.__get_strain_tensor_wiki(XXt)
                                for XXt in XXts]
 
-        superlattice = self.__build_superlattice(XA @ ADt, ADt, BrDts)
+
+        superlattice = self.__build_superlattice(XA @ ADt, ADt, BrDts, calc_atoms)
+
+        A_atoms_per_el_cell = len(self.__substrate.atoms())
+        atom_count = np.abs(np.linalg.det(ADt) * A_atoms_per_el_cell)
+        for layer, BrDt in zip(self.__layers, BrDts):
+            B_atoms_per_el_cell = len(layer[0].atoms())
+            atom_count += np.round(np.abs(np.linalg.det(BrDt) * B_atoms_per_el_cell))
 
         return Result(
             self,
@@ -410,7 +419,8 @@ class Heterostructure:
             strain_tensors,
             strain_tensors_wiki,
             ADt,
-            ABtrs
+            ABtrs,
+            atom_count = atom_count
         )
 
     @staticmethod
@@ -442,7 +452,7 @@ class Heterostructure:
         return F
 
     def __build_superlattice(self, XDt: Matrix2x2, ADt: Matrix2x2,
-                             BrDts: List[Matrix2x2]) -> Lattice:
+                             BrDts: List[Matrix2x2], calc_atoms=True) -> Lattice:
         """
         Creates Lattice object describing superlattice (supercell)
         of the heterostructure
@@ -469,12 +479,13 @@ class Heterostructure:
         res.set_vectors(*full_XDt.T.tolist())
 
         # atoms
-        for i, lay, MDt in zip(range(len(lattices)), lattices, MDts):
-            # We stack the layers one above the other so atoms must be moved up
-            # by the sum of z-sizes of all elementary cells of layers below
-            z_offset = self.__get_z_offset(i)
-            z_offset /= full_XDt[2, 2]  # angstrom -> Direct coordinates
-            Heterostructure.__superlattice_add_atoms(res, lay, MDt, z_offset)
+        if calc_atoms:
+            for i, lay, MDt in zip(range(len(lattices)), lattices, MDts):
+                # We stack the layers one above the other so atoms must be moved up
+                # by the sum of z-sizes of all elementary cells of layers below
+                z_offset = self.__get_z_offset(i)
+                z_offset /= full_XDt[2, 2]  # angstrom -> Direct coordinates
+                Heterostructure.__superlattice_add_atoms(res, lay, MDt, z_offset)
 
         return res
 
@@ -573,7 +584,7 @@ class Heterostructure:
     def opt(self,
             max_el: int = 6,
             thetas: Optional[List[Optional[List[float]]]] = None,
-            algorithm: str = "moire",
+            algorithm: str = "fast",
             log: bool = False
             ) -> Result:
         """
@@ -599,8 +610,8 @@ class Heterostructure:
             All angles are in radians.
 
         algorithm : str, optional
-            Default: "moire"
-            Accepted values: "moire", "brute"
+            Default: "fast"
+            Accepted values: "fast", "direct"
 
         log : bool, optional
             Default: False
@@ -644,9 +655,9 @@ class Heterostructure:
         config.log = log
 
         XA, XBs = self.__get_lattice_matrices()
-        if algorithm == "moire":
+        if algorithm == "fast":
             thetas, ADt, additional = MoireFinder(XA, XBs, thetas_in, config).solve()
-        else:  # "brute"
+        else:  # "direct"
             thetas, ADt, additional = StrainOptimisator(XA, XBs, thetas_in, config).solve()
 
         res = self.calc(ADt, thetas)

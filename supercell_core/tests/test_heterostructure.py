@@ -75,7 +75,7 @@ class TestHeterostructure(ut.TestCase):
         with self.assertRaises(IndexError):
             h.get_layer(10)
 
-    def test_opt(self, algorithm="moire"):
+    def test_opt(self, algorithm="fast"):
         # graphene-NiPS3 low-strain angle 21.9, theta range 16-30-0.1
         graphene = sc.read_POSCAR(
             path.join(path.dirname(__file__), "../resources/vasp/graphene/POSCAR"),
@@ -101,10 +101,10 @@ class TestHeterostructure(ut.TestCase):
         self.assertAlmostEqual(res.max_strain(), 0.000608879275296, places=5)
         self.assertEqual(res.atom_count(), 552)
 
-    def test_opt_brute(self):
-        return self.test_opt(algorithm="brute")
+    def test_opt_direct(self):
+        return self.test_opt(algorithm="direct")
 
-    def test_opt_graphene_moire(self):
+    def test_opt_graphene_fast(self):
         graphene = sc.read_POSCAR(
             path.join(path.dirname(__file__), "../resources/vasp/graphene/POSCAR"),
             atomic_species=["C"])

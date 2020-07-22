@@ -39,7 +39,7 @@ class OptSolverConfig:
 class OptSolver:
     """
 
-    TODO
+    TODO documentation
     """
 
     def __init__(self,
@@ -58,6 +58,7 @@ class OptSolver:
                 "max_strain",
                 "supercell_size",
                 "M_11", "M_12", "M_21", "M_22",
+                *["N{}_{}{}".format(n+1, i+1, j+1) for n in range(len(XBs)) for i in range(2) for j in range(2)],
                 "supercell_vectors_11", "supercell_vectors_12",
                 "supercell_vectors_21", "supercell_vectors_22",
                 *["strain_tensor_layer_{}_{}{}".format(k + 1, i + 1, j + 1)
@@ -67,7 +68,7 @@ class OptSolver:
             for column in columns:
                 self.log[column] = []
             if pd is None:
-                print("Pandas not installed! Returning a dictionary instead (log)")
+                print("Pandas not installed! Returning a dictionary instead (log)") # Jezu jak źle
 
         # Prepare all possible dt vectors (in A basis)
         self.dt_As = np.array([])
@@ -119,7 +120,8 @@ class OptSolver:
     def _update_opt_res(self,
                         thetas: Tuple[Angle, ...],
                         ADt: np.ndarray,
-                        sts: List[Matrix2x2]
+                        sts: List[Matrix2x2],
+                        XBrs: List[Matrix2x2]
                         ) -> None:
         """
         Checks if newly calculated result is better than the previous one
@@ -143,6 +145,14 @@ class OptSolver:
         new_res = (list(thetas), min_qty, XDt, sts)
         new_size = np.abs(np.linalg.det(XDt))
         if self.config.log:
+
+            for n, XBr in enumerate(XBrs):
+                BrDt = inv(XBr) @ self.XA @ ADt
+                BtrDt = np.round(BrDt)
+                for i in range(2):
+                    for j in range(2):
+                        self.log["N{}_{}{}".format(n+1, i+1, j+1)].append(BtrDt[i, j])
+
             for i, theta in enumerate(thetas):
                 self.log["theta_{}".format(i)].append(theta)
             self.log["max_strain"].append(min_qty)
@@ -319,7 +329,7 @@ class MoireFinder(OptSolver):
         memo = {}
         for i, (theta_, XB) in enumerate(zip(self.thetas, self.XBs)):
             for theta in theta_:
-                qtys = self._moire(XB, theta)
+                qtys = self._fast(XB, theta)
                 memo[float(theta), i] = qtys
 
         # We need to have this loop over all possible combinations since
@@ -359,11 +369,11 @@ class MoireFinder(OptSolver):
             sts = [self._calculate_strain_tensor(ADt, XBr) for XBr in XBrs]
             # TODO: move to update_opt_res
 
-            self._update_opt_res(theta_comb, ADt, sts)
+            self._update_opt_res(theta_comb, ADt, sts, XBrs)
 
         return self.get_result()
 
-    def _moire(self, XB: Matrix2x2, theta: float) -> np.ndarray:
+    def _fast(self, XB: Matrix2x2, theta: float) -> np.ndarray:
         """
         Calculates qualities of each dt vector in dt_As,
         where the measure of quality is a heuristic of
@@ -415,7 +425,7 @@ class MoireFinder(OptSolver):
             return False
 
         # 2. Is det in any other basis == 0?
-        # This can happen when the solution to the equation in `_moire` is bad and gives
+        # This can happen when the solution to the equation in `_fast` is bad and gives
         # e.g. values close to zero; this translates to impossible stretching of Br
         XBrs = [rotate(XB, theta) for XB, theta in zip(self.XBs, thetas)]
         BrDts = [inv(XBr) @ self.XA @ ADt for XBr in XBrs]
