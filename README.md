@@ -5,6 +5,8 @@ Author: Tomasz Necio, University of Warsaw
 
 Copyright (C) 2019-2020 University of Warsaw
 
+Please cite the following paper, if you use the software: Supercell-core software: A useful tool to generate an optimal supercell for vertically stacked nanomaterial, AIP Advances 10, 105105 (2020); https://doi.org/10.1063/5.0023984, T. Necio and M. Birowska.
+
 # Installation:
 `pip3 install supercell-core --user`
 
