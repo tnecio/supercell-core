@@ -74,7 +74,7 @@ class Result:
         self.__strain_tensors_wiki = strain_tensors_wiki
         self.__ADt = ADt
         self.__ABtrs = ABtrs
-        self.__atom_count = len(self.superlattice().atoms()) if atom_count is None else atom_count
+        self.__atom_count = len(self.superlattice().atoms()) if atom_count is None else round(atom_count)
 
     def strain_tensors(self, wiki_definition=False) -> \
             List[Matrix2x2]:

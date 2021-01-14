@@ -99,8 +99,8 @@ class Heterostructure:
     def add_layer(self,
                   layer: Lattice,
                   pos: Optional[int] = None,
-                  theta: Union[Angle, AngleRange] =
-                  (0, 180 * DEGREE, 0.1 * DEGREE)) -> "Heterostructure":
+                  theta: Union[Angle, AngleRange] = (0, 180 * DEGREE, 0.1 * DEGREE)
+                  ) -> "Heterostructure":
         """
         Adds a 2D crystal to the system
 
@@ -403,7 +403,6 @@ class Heterostructure:
         strain_tensors_wiki = [Heterostructure.__get_strain_tensor_wiki(XXt)
                                for XXt in XXts]
 
-
         superlattice = self.__build_superlattice(XA @ ADt, ADt, BrDts, calc_atoms)
 
         A_atoms_per_el_cell = len(self.__substrate.atoms())
@@ -420,7 +419,7 @@ class Heterostructure:
             strain_tensors_wiki,
             ADt,
             ABtrs,
-            atom_count = atom_count
+            atom_count=atom_count
         )
 
     @staticmethod
@@ -636,13 +635,17 @@ class Heterostructure:
                 return False
 
         if thetas is not None:
-            if is_iterable(thetas[0]):
-                thetas_in = [arg if arg is not None else np.arange(*lay_desc[1])
-                             for arg, lay_desc in zip(thetas, self.__layers)]
+            if is_iterable(thetas[0]) and len(thetas) == len(self.__layers):
+                thetas_in = thetas
             elif len(self.__layers) == 1:
                 thetas_in = [thetas]
             else:
-                raise TypeError("Bad argument thetas")
+                raise TypeError("""Bad argument thetas. If specified, it should be a list of iterables each corresponding to a layer, e.g.
+for heterostructure with 2 layers valid arg might be: thetas=[np.arange(0, np.pi, np.pi/16), np.arange(0, 180 * sc.DEGREE, 1 * sc.DEGREE)]
+    -- the first np.arange specifies the range of angles to check for the first layer, second is for the second layer etc.
+If, and only if, there is only one layer in the heterostructure, you don't need to wrap the range in a list, e.g.
+thetas=np.arange(0, 180 * sc.DEGREE, 1 * sc.DEGREE)
+""")
         else:
             thetas_in = [np.arange(*lay_desc[1]) for lay_desc in self.__layers]
 

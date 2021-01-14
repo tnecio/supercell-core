@@ -117,4 +117,21 @@ class TestHeterostructure(ut.TestCase):
         self.assertAlmostEqual(res.max_strain(), 0, places=6)
         self.assertEqual(res.atom_count(), 364)
 
-    # `calc` is called by `opt` so for now we can do without a separate test
+    def test_homogeneous_trilayer(self):
+        graphene = sc.read_POSCAR(
+            path.join(path.dirname(__file__), "../resources/vasp/graphene/POSCAR"),
+            atomic_species=["C"])
+
+        h = sc.heterostructure().set_substrate(graphene).add_layer(graphene).add_layer(graphene)
+        res = h.opt(max_el=4, thetas=[np.arange(0, 10*sc.DEGREE, 1 * sc.DEGREE)]*2)
+
+        self.assertEqual(res.atom_count(), 3 * len(graphene.atoms()))
+
+    def test_bad_arg_thetas(self):
+        graphene = sc.read_POSCAR(
+            path.join(path.dirname(__file__), "../resources/vasp/graphene/POSCAR"),
+            atomic_species=["C"])
+
+        h = sc.heterostructure().set_substrate(graphene).add_layer(graphene).add_layer(graphene)
+        with self.assertRaises(TypeError):
+            h.opt(max_el=4, thetas=[np.arange(0, 10 * sc.DEGREE, 1 * sc.DEGREE)])
