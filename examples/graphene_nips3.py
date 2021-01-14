@@ -1,8 +1,9 @@
 import supercell_core as sc
+import matplotlib.pyplot as plt
 
 # Read graphene and NiPS3 definition from POSCAR
 graphene = sc.read_POSCAR("supercell_core/resources/vasp/POSCAR_Gr")
-nips3 = sc.read_POSCAR("supercell_core/resources/vasp/POSCAR_NiPS3")
+nips3 = sc.read_POSCAR("supercell_core/resources/vasp/POSCAR_NiPS3", atomic_species=['Ni', 'P', 'S'])
 h = sc.heterostructure().set_substrate(graphene)\
 .add_layer(nips3)
 
