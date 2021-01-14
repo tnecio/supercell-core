@@ -121,7 +121,6 @@ class OptSolver:
                         thetas: Tuple[Angle, ...],
                         ADt: np.ndarray,
                         sts: List[Matrix2x2],
-                        XBrs: List[Matrix2x2]
                         ) -> None:
         """
         Checks if newly calculated result is better than the previous one
@@ -145,14 +144,6 @@ class OptSolver:
         new_res = (list(thetas), min_qty, XDt, sts)
         new_size = np.abs(np.linalg.det(XDt))
         if self.config.log:
-
-            for n, XBr in enumerate(XBrs):
-                BrDt = inv(XBr) @ self.XA @ ADt
-                BtrDt = np.round(BrDt)
-                for i in range(2):
-                    for j in range(2):
-                        self.log["N{}_{}{}".format(n+1, i+1, j+1)].append(BtrDt[i, j])
-
             for i, theta in enumerate(thetas):
                 self.log["theta_{}".format(i)].append(theta)
             self.log["max_strain"].append(min_qty)
@@ -369,7 +360,7 @@ class MoireFinder(OptSolver):
             sts = [self._calculate_strain_tensor(ADt, XBr) for XBr in XBrs]
             # TODO: move to update_opt_res
 
-            self._update_opt_res(theta_comb, ADt, sts, XBrs)
+            self._update_opt_res(theta_comb, ADt, sts)
 
         return self.get_result()
 

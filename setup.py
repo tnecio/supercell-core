@@ -11,7 +11,7 @@ def readme():
 
 setuptools.setup(
     name='supercell_core',
-    version='0.1.5',
+    version='0.1.6',
     packages=setuptools.find_packages(),
     url='https://github.com/tnecio/supercell-core',
     license='GPLv3',
