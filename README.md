@@ -16,16 +16,17 @@ https://readthedocs.org/projects/supercell-core/
 
 # Usage example
 
-```
-# Load supercell_core
+```python
+# Load supercell_core and NumPy
 import supercell_core as sc
+import numpy as np
 
 # Read NiPS3 data from a POSCAR file into `nips3` Lattice object
 # We need to provide names of chemical elements because they don't have to
 # appear in POSCAR, but supercell-core needs them
 # This will only work if you actually have a file named "POSCAR_nips3",
 # you can copy it from /supercell_core/resources/vasp/NiPS3 directory
-nips3 = sc.read_POSCAR("POSCAR_nips3", ["Ni", "P", "S"])
+nips3 = sc.read_POSCAR("POSCAR_nips3", atomic_species=["Ni", "P", "S"])
 
 # Let's create `graphene` Lattice object by hand
 graphene = sc.lattice()
